@@ -112,7 +112,7 @@
       <input
         type="file"
         accept="audio/*"
-        capture="user"
+        capture="environment"
         on:change={onFile}
         disabled={busy}
       />
