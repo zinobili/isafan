@@ -8,6 +8,7 @@ export type PlayerView = {
 };
 
 export type OriginalView = { durationMs: number; url: string };
+export type AttemptView = { id: string; name: string; durationMs: number; url: string };
 
 export type GameView = {
   code: string;
@@ -18,6 +19,7 @@ export type GameView = {
   createdAt: number;
   players: PlayerView[];
   original: OriginalView | null;
+  attempts: AttemptView[];
 };
 
 export type ConnState = "idle" | "connecting" | "open" | "closed";

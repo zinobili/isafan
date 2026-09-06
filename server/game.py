@@ -63,7 +63,9 @@ class Game:
     created_at: float = field(default_factory=time.time)
     round_no: int = 0
     # Set once the host's recording has been reversed and stored.
-    original: dict | None = None  # {"durationMs", "uploadedBy", "at"}
+    original: dict | None = None  # {"durationMs", "sourceExt", "uploadedBy", "at"}
+    # One entry per submitted mimic; each has a reversed clip stored alongside.
+    attempts: list[dict] = field(default_factory=list)  # {"id","name","sourceExt","durationMs","by","at"}
 
     def audio_url(self, name: str) -> str:
         return f"/api/games/{self.code}/audio/{name}"
@@ -75,6 +77,35 @@ class Game:
             "durationMs": self.original["durationMs"],
             "url": self.audio_url("original_reversed.wav"),
         }
+
+    @staticmethod
+    def new_attempt_id() -> str:
+        return secrets.token_urlsafe(6)
+
+    def add_attempt(
+        self, *, id: str, name: str, source_ext: str, duration_ms: int, by: str = ""
+    ) -> dict:
+        entry = {
+            "id": id,
+            "name": _clean_name(name),
+            "sourceExt": source_ext,
+            "durationMs": duration_ms,
+            "by": by,
+            "at": time.time(),
+        }
+        self.attempts.append(entry)
+        return entry
+
+    def attempts_public(self) -> list[dict]:
+        return [
+            {
+                "id": a["id"],
+                "name": a["name"],
+                "durationMs": a["durationMs"],
+                "url": self.audio_url(f"attempt_{a['id']}_reversed.wav"),
+            }
+            for a in self.attempts
+        ]
 
     def add_player(self, name: str, as_host: bool = False) -> Player:
         pid = secrets.token_urlsafe(9)
@@ -102,6 +133,7 @@ class Game:
             "createdAt": self.created_at,
             "players": [p.public() for p in self.players.values()],
             "original": self.original_public(),
+            "attempts": self.attempts_public(),
         }
 
     def to_json(self) -> str:
@@ -114,6 +146,7 @@ class Game:
                 "createdAt": self.created_at,
                 "roundNo": self.round_no,
                 "original": self.original,
+                "attempts": self.attempts,
                 "players": [
                     {"id": p.id, "name": p.name, "isHost": p.is_host, "joinedAt": p.joined_at}
                     for p in self.players.values()

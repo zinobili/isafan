@@ -79,12 +79,27 @@ def game_summary(code: str):
     }
 
 
+@app.post("/api/solo")
+def create_solo() -> dict:
+    """One-device / pass-the-phone game. No WebSocket, no players list — the
+    single page drives the flow and talks only to the audio endpoints."""
+    game = registry.create(mode="solo")
+    return {"code": game.code}
+
+
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket) -> None:
     await hub.handle(ws)
 
 
 app.include_router(media.build_router(registry, storage, hub))
+
+
+@app.api_route("/api/{_rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+def api_not_found(_rest: str):
+    """Anything under /api that no route above matched is a real 404 — don't let
+    it fall through to the SPA fallback and return index.html."""
+    return JSONResponse({"detail": "not found"}, status_code=404)
 
 
 # --- static SPA (optional; present after `npm run build`) --------------------

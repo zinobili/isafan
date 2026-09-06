@@ -7,27 +7,31 @@ attempt is reversed again so the group can judge who landed closest.
 Architecture, options, and the full roadmap live in the plan doc:
 `~/.claude/plans/i-want-to-create-vectorized-parnas.md`.
 
-## Status — Phase 2 (audio I/O)
+## Status — Phase 3 (single-device mode)
 
 Done:
 
 - **Phase 1** — FastAPI server (`/api/health`, `/api/games/{code}`, `/ws`),
   `Storage` abstraction (local disk), in-memory game registry with readable
-  4-char codes, create/join/live lobby/rejoin, Svelte + Vite SPA
-  (`/` join, `/host`, `/debug`).
+  4-char codes, create/join/live lobby/rejoin, Svelte + Vite SPA.
 - **Phase 2** — host records the song → `POST /api/games/{code}/original` →
   server reverses + transcodes to a canonical 16 kHz mono WAV with ffmpeg →
-  players fetch and play it from `GET /api/games/{code}/audio/original_reversed.wav`.
-  Phases `HOST_RECORDING` / `REVERSING` / `REVERSED_PLAYBACK` drive the UI.
+  players fetch and play `GET /api/games/{code}/audio/original_reversed.wav`.
   ffmpeg ships via the `imageio-ffmpeg` dependency — no system install.
+- **Phase 3** — `/solo` pass-the-phone flow, no WebSocket: name the players →
+  record the song → hear it backwards → each player records a mimic in turn
+  (`POST /api/games/{code}/attempts`, one reversed clip stored per take) →
+  reveal each take forwards → show-of-hands vote. `POST /api/solo` creates the
+  game; the same audio endpoints (host checks skipped for `mode == "solo"`)
+  do the work.
 
-Not yet: the audience recording + reveal loop, single-device mode, voting,
-retention task, admin portal (Phases 3–7).
+Not yet: the multi-device audience loop, retention task, admin portal
+(Phases 4–7).
 
-> The in-app browser blocks microphone capture, so the actual `MediaRecorder`
-> path (record → encode → upload) still needs a check on a real Android phone and
-> a real iPhone — formats differ (webm/opus vs mp4/aac) and the server transcodes
-> both, but only real devices confirm it.
+> The in-app browser blocks the mic, so the multi-device `MediaRecorder` path
+> still needs a check on a real Android phone and a real iPhone (formats differ:
+> webm/opus vs mp4/aac; the server transcodes both). The `/solo` flow was
+> verified in-browser with a synthetic mic and headless end to end.
 
 ## Prerequisites
 

@@ -78,9 +78,10 @@
       </button>
     </div>
 
-    <button class="secondary" on:click={() => navigate("/host")}>
-      Host a game instead
-    </button>
+    <div class="row">
+      <button class="secondary" on:click={() => navigate("/host")}>Host a game</button>
+      <button class="secondary" on:click={() => navigate("/solo")}>One device</button>
+    </div>
     <div class="status">connection: {$connState}</div>
   </div>
 {/if}

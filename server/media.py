@@ -1,13 +1,18 @@
 """Audio upload + download.
 
-POST /api/games/{code}/original   host uploads the sung take; the server reverses
-                                  + transcodes it and moves the game to
-                                  REVERSED_PLAYBACK.
+POST /api/games/{code}/original    the sung take; reversed + transcoded, moves
+                                   the game to REVERSED_PLAYBACK.
+POST /api/games/{code}/attempts    one player's mimic; reversed + transcoded,
+                                   appended to the game's attempts.
 GET  /api/games/{code}/audio/{name}   serve a stored clip (allow-listed names).
+
+In multi-device mode `/original` is host-only and `/attempts` requires a known
+playerId. Solo mode (one device, pass-the-phone) skips both checks.
 """
 
 from __future__ import annotations
 
+import re
 import tempfile
 import time
 from pathlib import Path
@@ -17,7 +22,7 @@ from fastapi.responses import FileResponse
 
 from . import audio
 from .config import settings
-from .game import GameRegistry, Phase
+from .game import Game, GameRegistry, Phase
 from .storage import Storage
 from .ws import Hub
 
@@ -42,6 +47,10 @@ _MEDIA_TYPE_BY_EXT = {
     "mp3": "audio/mpeg",
 }
 _SOURCE_EXTS = tuple(_MEDIA_TYPE_BY_EXT)
+_ATTEMPT_REVERSED_RE = re.compile(r"^attempt_[A-Za-z0-9_-]{1,16}_reversed\.wav$")
+_ATTEMPT_SOURCE_RE = re.compile(
+    r"^attempt_[A-Za-z0-9_-]{1,16}_source\.(" + "|".join(_SOURCE_EXTS) + r")$"
+)
 
 
 async def _read_capped(file: UploadFile, limit: int) -> bytes:
@@ -62,48 +71,59 @@ def _ext_for(file: UploadFile) -> str:
     return suffix if suffix in _MEDIA_TYPE_BY_EXT else "bin"
 
 
+async def _ingest_reversed(
+    file: UploadFile, code: str, storage: Storage, *, source_key: str, reversed_key: str
+) -> tuple[float, str]:
+    """Read an upload, store it, produce + store its reversed WAV. Returns
+    (duration_seconds, source_ext)."""
+    if not audio.ffmpeg_available():
+        raise HTTPException(503, "audio processing unavailable (ffmpeg missing)")
+
+    raw = await _read_capped(file, settings.max_upload_bytes)
+    if not raw:
+        raise HTTPException(400, "empty upload")
+    ext = _ext_for(file)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / f"src.{ext}"
+        src.write_bytes(raw)
+
+        duration = audio.probe_duration_seconds(src)
+        if duration is None:
+            raise HTTPException(400, "could not read that file as audio")
+        if duration > settings.max_clip_seconds:
+            raise HTTPException(
+                400, f"recording is {duration:.0f}s; limit is {settings.max_clip_seconds}s"
+            )
+
+        out = Path(tmp) / "reversed.wav"
+        try:
+            audio.reverse_to_wav(src, out)
+        except audio.FfmpegError as e:
+            raise HTTPException(422, str(e))
+
+        storage.put_bytes(f"{source_key}.{ext}", raw)
+        storage.put_bytes(reversed_key, out.read_bytes())
+
+    return duration, ext
+
+
 def build_router(registry: GameRegistry, storage: Storage, hub: Hub) -> APIRouter:
     router = APIRouter(prefix="/api/games/{code}")
 
     @router.post("/original")
-    async def upload_original(code: str, file: UploadFile, playerId: str = Form(...)):
+    async def upload_original(code: str, file: UploadFile, playerId: str = Form("")):
         game = registry.get(code)
         if not game:
             raise HTTPException(404, "no game with that code")
-        if playerId != game.host_id:
+        if game.mode != "solo" and playerId != game.host_id:
             raise HTTPException(403, "only the host records the original")
-        if not audio.ffmpeg_available():
-            raise HTTPException(503, "audio processing unavailable (ffmpeg missing)")
 
-        raw = await _read_capped(file, settings.max_upload_bytes)
-        if not raw:
-            raise HTTPException(400, "empty upload")
-        ext = _ext_for(file)
-
-        with tempfile.TemporaryDirectory() as tmp:
-            src = Path(tmp) / f"src.{ext}"
-            src.write_bytes(raw)
-
-            duration = audio.probe_duration_seconds(src)
-            if duration is None:
-                raise HTTPException(400, "could not read that file as audio")
-            if duration > settings.max_clip_seconds:
-                raise HTTPException(
-                    400,
-                    f"recording is {duration:.0f}s; limit is {settings.max_clip_seconds}s",
-                )
-
-            reversed_wav = Path(tmp) / "original_reversed.wav"
-            try:
-                audio.reverse_to_wav(src, reversed_wav)
-            except audio.FfmpegError as e:
-                raise HTTPException(422, str(e))
-
-            storage.put_bytes(f"games/{code}/original_source.{ext}", raw)
-            storage.put_bytes(
-                f"games/{code}/original_reversed.wav", reversed_wav.read_bytes()
-            )
-
+        duration, ext = await _ingest_reversed(
+            file, code, storage,
+            source_key=f"games/{code}/original_source",
+            reversed_key=f"games/{code}/original_reversed.wav",
+        )
         game.original = {
             "durationMs": round(duration * 1000),
             "sourceExt": ext,
@@ -113,14 +133,48 @@ def build_router(registry: GameRegistry, storage: Storage, hub: Hub) -> APIRoute
         game.phase = Phase.REVERSED_PLAYBACK
         registry.persist(game)
         await hub.broadcast(code)
-
         return {"ok": True, **game.original_public()}
+
+    @router.post("/attempts")
+    async def upload_attempt(
+        code: str, file: UploadFile, name: str = Form(""), playerId: str = Form("")
+    ):
+        game = registry.get(code)
+        if not game:
+            raise HTTPException(404, "no game with that code")
+        if game.mode != "solo" and playerId not in game.players:
+            raise HTTPException(403, "join the game before submitting a take")
+        if not game.original:
+            raise HTTPException(409, "no original recorded yet")
+
+        eid = game.new_attempt_id()
+        duration, ext = await _ingest_reversed(
+            file, code, storage,
+            source_key=f"games/{code}/attempt_{eid}_source",
+            reversed_key=f"games/{code}/attempt_{eid}_reversed.wav",
+        )
+        entry = game.add_attempt(
+            id=eid, name=name, source_ext=ext, duration_ms=round(duration * 1000), by=playerId
+        )
+
+        if game.phase in (Phase.LOBBY, Phase.HOST_RECORDING, Phase.REVERSING, Phase.REVERSED_PLAYBACK):
+            game.phase = Phase.AUDIENCE_RECORDING
+        registry.persist(game)
+        await hub.broadcast(code)
+        return {
+            "id": eid,
+            "name": entry["name"],
+            "durationMs": entry["durationMs"],
+            "url": game.audio_url(f"attempt_{eid}_reversed.wav"),
+        }
 
     @router.get("/audio/{name}")
     def get_audio(code: str, name: str):
-        if name == "original_reversed.wav":
-            key = f"games/{code}/original_reversed.wav"
-        elif name.startswith("original_source.") and name.split(".")[-1] in _SOURCE_EXTS:
+        if name == "original_reversed.wav" or (
+            name.startswith("original_source.") and name.split(".")[-1] in _SOURCE_EXTS
+        ):
+            key = f"games/{code}/{name}"
+        elif _ATTEMPT_REVERSED_RE.match(name) or _ATTEMPT_SOURCE_RE.match(name):
             key = f"games/{code}/{name}"
         else:
             raise HTTPException(404, "unknown clip")
