@@ -1,6 +1,11 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy } from "svelte";
-  import { startRecording, micSupported, type Recording } from "./audio";
+  import {
+    startRecording,
+    canRecordInline,
+    recordingFromFile,
+    type Recording,
+  } from "./audio";
 
   export let hint = "Tap start, sing, then tap stop.";
   export let useLabel = "Use this take";
@@ -8,6 +13,9 @@
   export let busy = false;
 
   const dispatch = createEventDispatcher<{ done: { recording: Recording } }>();
+
+  // false on a plain-http LAN page: fall back to the phone's own recorder
+  const inline = canRecordInline();
 
   type Ui = "idle" | "warming" | "recording" | "preview";
   let ui: Ui = "idle";
@@ -24,7 +32,7 @@
     timer = null;
   }
 
-  /** back to the start — requires an explicit "Start recording" tap again */
+  /** back to the start — requires an explicit tap to record again */
   function toIdle() {
     stopTimer();
     if (takeUrl) URL.revokeObjectURL(takeUrl);
@@ -67,6 +75,18 @@
     ui = "preview";
   }
 
+  function onFile(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ""; // allow re-picking the same file after a Redo
+    if (!file) return;
+    err = "";
+    if (takeUrl) URL.revokeObjectURL(takeUrl);
+    take = recordingFromFile(file);
+    takeUrl = URL.createObjectURL(file);
+    ui = "preview";
+  }
+
   function use() {
     if (take) dispatch("done", { recording: take });
   }
@@ -82,13 +102,17 @@
   });
 </script>
 
-{#if !micSupported()}
-  <span class="err">This browser can't record audio. Use Chrome/Safari on an HTTPS page.</span>
-{/if}
-
 {#if ui === "idle"}
-  <p>{hint}</p>
-  <button on:click={begin} disabled={!micSupported() || busy}>Start recording</button>
+  {#if inline}
+    <p>{hint}</p>
+    <button on:click={begin} disabled={busy}>Start recording</button>
+  {:else}
+    <p>This page can't record in the browser (needs HTTPS), so use your phone's recorder.</p>
+    <label class="filepick" class:disabled={busy}>
+      <input type="file" accept="audio/*" on:change={onFile} disabled={busy} />
+      🎙 Record / choose audio
+    </label>
+  {/if}
 {:else if ui === "warming"}
   <p>Opening the mic…</p>
   <button disabled>Starting…</button>
@@ -111,6 +135,29 @@
 {#if err}<span class="err">{err}</span>{/if}
 
 <style>
+  .filepick {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font: inherit;
+    font-weight: 600;
+    padding: 13px 16px;
+    border-radius: 11px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    cursor: pointer;
+    min-height: 46px;
+    text-align: center;
+  }
+  .filepick input {
+    display: none;
+  }
+  .filepick.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
   .rec {
     display: flex;
     align-items: center;

@@ -26,14 +26,23 @@ from .game import GameRegistry, Phase
 from .storage import Storage
 from .ws import Hub
 
+# The file-input fallback (plain-http LAN pages) uploads whatever the phone's
+# own recorder produces — iOS gives m4a/caf, Android often 3gp/amr. ffmpeg
+# content-sniffs regardless; these maps just keep the stored filename sane.
 _EXT_BY_MIME = {
     "audio/webm": "webm",
     "video/webm": "webm",
     "audio/ogg": "ogg",
+    "audio/opus": "ogg",
     "audio/mp4": "mp4",
     "video/mp4": "mp4",
+    "audio/x-m4a": "m4a",
+    "audio/m4a": "m4a",
     "audio/aac": "aac",
     "audio/mpeg": "mp3",
+    "audio/3gpp": "3gp",
+    "audio/amr": "amr",
+    "audio/x-caf": "caf",
     "audio/wav": "wav",
     "audio/x-wav": "wav",
     "audio/wave": "wav",
@@ -43,8 +52,12 @@ _MEDIA_TYPE_BY_EXT = {
     "webm": "audio/webm",
     "ogg": "audio/ogg",
     "mp4": "audio/mp4",
+    "m4a": "audio/mp4",
     "aac": "audio/aac",
     "mp3": "audio/mpeg",
+    "3gp": "audio/3gpp",
+    "amr": "audio/amr",
+    "caf": "audio/x-caf",
 }
 _SOURCE_EXTS = tuple(_MEDIA_TYPE_BY_EXT)
 _ATTEMPT_REVERSED_RE = re.compile(r"^attempt_[A-Za-z0-9_-]{1,16}_reversed\.wav$")

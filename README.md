@@ -29,9 +29,11 @@ Done:
 
 Not yet: retention task, admin portal (Phases 5–7).
 
-> The in-app browser blocks the mic, so the `MediaRecorder` capture path still
-> needs a check on a real Android phone and a real iPhone (formats differ:
-> webm/opus vs mp4/aac; the server transcodes both). Both flows were verified
+> On a plain-http LAN page the browser blocks in-page recording, so the record
+> control falls back to the phone's own voice recorder via a file input (see
+> "Recording over plain HTTP"). The in-page `MediaRecorder` path still wants a
+> check on a real Android phone and a real iPhone over HTTPS (formats differ:
+> webm/opus vs mp4/aac; the server transcodes both). Flows were verified
 > in-browser with a synthetic mic and headless end to end.
 
 ## Prerequisites
@@ -87,9 +89,31 @@ adapter was picked first) and the QR updates. Or pin one yourself:
 point it at a tunnel URL).
 
 Notes: Windows Firewall may prompt to allow port 8000 (allow it for Private
-networks). A VPN on this machine can block phone↔PC LAN traffic. Microphone
-recording needs HTTPS, so a same-Wi-Fi `http://` setup only covers the
-join/lobby flow — use a tunnel for the full game.
+networks). A VPN on this machine can block phone↔PC LAN traffic.
+
+### Recording over plain HTTP
+
+`getUserMedia` (in-page recording) only works in a secure context — HTTPS or
+`localhost`. On a phone hitting `http://<lan-ip>:8000` it's blocked, so the
+record control automatically falls back to a **file input**: the phone opens its
+own voice recorder, and the clip is uploaded through the same pipeline. Slightly
+clunkier (no in-page REC timer), but zero setup and works on iOS and Android.
+
+For the polished in-page recorder without a tunnel, serve HTTPS with a
+locally-trusted cert:
+
+```bash
+mkcert -install                         # once, trusts a local CA on this machine
+mkcert 192.168.1.20 localhost 127.0.0.1 # -> 192.168.1.20+2.pem  + -key.pem
+```
+
+Then set `ISAFAN_SSL_CERT` / `ISAFAN_SSL_KEY` (and
+`ISAFAN_PUBLIC_URL=https://192.168.1.20:8000`) and run `python -m server`. On
+each phone, install the mkcert root CA once — `mkcert -CAROOT` shows where
+`rootCA.pem` lives; on iOS install the profile then enable it under Settings →
+General → About → Certificate Trust Settings, on Android use "Install a
+certificate → CA certificate". After that the phone trusts `https://<lan-ip>`
+and records in-page.
 
 ## Tests
 

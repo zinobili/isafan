@@ -28,6 +28,7 @@
   let qr = "";
   let candidates: string[] = [location.origin];
   let chosen = location.origin;
+  const secure = window.isSecureContext === true;
 
   // HOST_RECORDING upload state
   let busy = false;
@@ -98,6 +99,12 @@
             </button>
           {/each}
         </div>
+      {/if}
+      {#if !secure}
+        <p class="note">
+          Plain HTTP — phones will record with their own voice recorder instead of
+          in the page. For in-page recording without a tunnel, see the README (mkcert).
+        </p>
       {/if}
     </div>
 
@@ -206,5 +213,10 @@
   .alts button.active {
     background: var(--accent);
     color: #fff;
+  }
+  .note {
+    font-size: 0.72rem;
+    color: var(--warn);
+    text-align: center;
   }
 </style>

@@ -37,6 +37,8 @@ class Settings:
     audio_sample_rate: int        # canonical WAV sample rate
     max_clip_seconds: int         # reject recordings longer than this
     max_upload_bytes: int         # reject uploads larger than this
+    ssl_certfile: str             # set both to serve HTTPS (e.g. an mkcert pair)
+    ssl_keyfile: str              # so phones on the LAN can record in-page
 
 
 def _int(name: str, default: int) -> int:
@@ -82,6 +84,8 @@ def load_settings() -> Settings:
         audio_sample_rate=_int("ISAFAN_AUDIO_SR", 16_000),
         max_clip_seconds=_int("ISAFAN_MAX_CLIP_SECONDS", 45),
         max_upload_bytes=_int("ISAFAN_MAX_UPLOAD_BYTES", 25 * 1024 * 1024),
+        ssl_certfile=os.environ.get("ISAFAN_SSL_CERT", "").strip(),
+        ssl_keyfile=os.environ.get("ISAFAN_SSL_KEY", "").strip(),
     )
 
 

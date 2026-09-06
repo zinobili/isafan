@@ -44,6 +44,24 @@ def test_original_host_only(client, webm_bytes):
     assert registry.get(g.code).phase is Phase.REVERSED_PLAYBACK
 
 
+def test_attempt_accepts_phone_recorder_upload(client, webm_bytes):
+    """The file-input fallback uploads whatever the phone's recorder produced —
+    an m4a-ish name with a vague content-type. It's still real audio, so it
+    should be reversed and stored, not rejected."""
+    g = registry.create("solo")
+    client.post(f"/api/games/{g.code}/original", files=_files(webm_bytes), data={"playerId": ""})
+    g.phase = Phase.AUDIENCE_RECORDING
+
+    r = client.post(
+        f"/api/games/{g.code}/attempts",
+        files={"file": ("memo.m4a", webm_bytes, "audio/x-m4a")},
+        data={"name": "Ada", "playerId": ""},
+    )
+    assert r.status_code == 200
+    assert r.json()["url"].endswith("_reversed.wav")
+    assert registry.get(g.code).attempts[0]["sourceExt"] == "m4a"
+
+
 def test_original_rejects_non_audio(client):
     g = registry.create("multi")
     host = g.add_player("H", as_host=True)
