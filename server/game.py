@@ -66,6 +66,8 @@ class Game:
     original: dict | None = None  # {"durationMs", "sourceExt", "uploadedBy", "at"}
     # One entry per submitted mimic; each has a reversed clip stored alongside.
     attempts: list[dict] = field(default_factory=list)  # {"id","name","sourceExt","durationMs","by","at"}
+    # voter player id -> attempt id (each voter counts once; changeable)
+    votes: dict[str, str] = field(default_factory=dict)
 
     def audio_url(self, name: str) -> str:
         return f"/api/games/{self.code}/audio/{name}"
@@ -102,11 +104,31 @@ class Game:
             {
                 "id": a["id"],
                 "name": a["name"],
+                "by": a["by"],
                 "durationMs": a["durationMs"],
                 "url": self.audio_url(f"attempt_{a['id']}_reversed.wav"),
             }
             for a in self.attempts
         ]
+
+    def attempt(self, attempt_id: str | None) -> dict | None:
+        return next((a for a in self.attempts if a["id"] == attempt_id), None)
+
+    def cast_vote(self, voter_id: str, attempt_id: str | None) -> bool:
+        target = self.attempt(attempt_id)
+        if not target:
+            return False
+        if target["by"] and target["by"] == voter_id:
+            return False  # no voting for your own take
+        self.votes[voter_id] = target["id"]
+        return True
+
+    def reset_for_new_round(self) -> None:
+        self.round_no += 1
+        self.original = None
+        self.attempts = []
+        self.votes = {}
+        self.phase = Phase.HOST_RECORDING
 
     def add_player(self, name: str, as_host: bool = False) -> Player:
         pid = secrets.token_urlsafe(9)
@@ -135,6 +157,7 @@ class Game:
             "players": [p.public() for p in self.players.values()],
             "original": self.original_public(),
             "attempts": self.attempts_public(),
+            "votes": dict(self.votes),
         }
 
     def to_json(self) -> str:
@@ -148,6 +171,7 @@ class Game:
                 "roundNo": self.round_no,
                 "original": self.original,
                 "attempts": self.attempts,
+                "votes": self.votes,
                 "players": [
                     {"id": p.id, "name": p.name, "isHost": p.is_host, "joinedAt": p.joined_at}
                     for p in self.players.values()

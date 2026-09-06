@@ -8,7 +8,13 @@ export type PlayerView = {
 };
 
 export type OriginalView = { durationMs: number; url: string; forwardUrl: string };
-export type AttemptView = { id: string; name: string; durationMs: number; url: string };
+export type AttemptView = {
+  id: string;
+  name: string;
+  by: string;
+  durationMs: number;
+  url: string;
+};
 
 export type GameView = {
   code: string;
@@ -20,6 +26,7 @@ export type GameView = {
   players: PlayerView[];
   original: OriginalView | null;
   attempts: AttemptView[];
+  votes: Record<string, string>; // voterId -> attemptId
 };
 
 export type ConnState = "idle" | "connecting" | "open" | "closed";
@@ -184,6 +191,26 @@ export function startRecording(): void {
 /** Host: discard the take and go back to the lobby. */
 export function resetRound(): void {
   send({ type: "reset_round" });
+}
+
+/** Host: REVERSED_PLAYBACK -> AUDIENCE_RECORDING (everyone records their mimic). */
+export function startAudienceRecording(): void {
+  send({ type: "start_audience_recording" });
+}
+
+/** Host: AUDIENCE_RECORDING -> REVEAL. */
+export function startReveal(): void {
+  send({ type: "start_reveal" });
+}
+
+/** Host: clear the round and go back to recording a new song. */
+export function nextRound(): void {
+  send({ type: "next_round" });
+}
+
+/** Any player: vote for a take (changeable; not your own). */
+export function castVote(attemptId: string): void {
+  send({ type: "vote", attemptId });
 }
 
 export function sendEcho(payload: unknown): void {

@@ -162,10 +162,24 @@ def build_router(registry: GameRegistry, storage: Storage, hub: Hub) -> APIRoute
         game = registry.get(code)
         if not game:
             raise HTTPException(404, "no game with that code")
-        if game.mode != "solo" and playerId not in game.players:
-            raise HTTPException(403, "join the game before submitting a take")
         if not game.original:
             raise HTTPException(409, "no original recorded yet")
+
+        if game.mode == "solo":
+            # pass-the-phone: takes append, phase advances leniently
+            if game.phase in (Phase.LOBBY, Phase.HOST_RECORDING, Phase.REVERSING, Phase.REVERSED_PLAYBACK):
+                game.phase = Phase.AUDIENCE_RECORDING
+        else:
+            if playerId not in game.players:
+                raise HTTPException(403, "join the game before submitting a take")
+            if game.phase is not Phase.AUDIENCE_RECORDING:
+                raise HTTPException(409, "the round isn't taking takes right now")
+            # one take per player — a resubmission replaces the previous one
+            prev = next((a for a in game.attempts if a["by"] == playerId), None)
+            if prev:
+                storage.delete(f"games/{code}/attempt_{prev['id']}_reversed.wav")
+                storage.delete(f"games/{code}/attempt_{prev['id']}_source.{prev['sourceExt']}")
+                game.attempts = [a for a in game.attempts if a["id"] != prev["id"]]
 
         eid = game.new_attempt_id()
         duration, ext = await _ingest_reversed(
@@ -176,9 +190,6 @@ def build_router(registry: GameRegistry, storage: Storage, hub: Hub) -> APIRoute
         entry = game.add_attempt(
             id=eid, name=name, source_ext=ext, duration_ms=round(duration * 1000), by=playerId
         )
-
-        if game.phase in (Phase.LOBBY, Phase.HOST_RECORDING, Phase.REVERSING, Phase.REVERSED_PLAYBACK):
-            game.phase = Phase.AUDIENCE_RECORDING
         registry.persist(game)
         await hub.broadcast(code)
         return {

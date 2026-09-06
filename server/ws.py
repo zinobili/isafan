@@ -102,9 +102,17 @@ class Hub:
                     await self._detach(code, player_id, remove=True)
                     code, player_id = None, None
                 elif mtype == "start_recording":
-                    await self._host_set_phase(ws, code, player_id, Phase.HOST_RECORDING, clear_original=True)
+                    await self._host_set_phase(ws, code, player_id, Phase.HOST_RECORDING, clear_round=True)
                 elif mtype == "reset_round":
-                    await self._host_set_phase(ws, code, player_id, Phase.LOBBY, clear_original=True)
+                    await self._host_set_phase(ws, code, player_id, Phase.LOBBY, clear_round=True)
+                elif mtype == "start_audience_recording":
+                    await self._start_audience_recording(ws, code, player_id)
+                elif mtype == "start_reveal":
+                    await self._host_set_phase(ws, code, player_id, Phase.REVEAL)
+                elif mtype == "next_round":
+                    await self._next_round(ws, code, player_id)
+                elif mtype == "vote":
+                    await self._vote(ws, code, player_id, msg.get("attemptId"))
                 else:
                     await self._err(ws, "unknown_type", f"unknown message type: {mtype!r}")
         except WebSocketDisconnect:
@@ -165,17 +173,55 @@ class Hub:
         await self._broadcast(game.code)
         return game.code, pid
 
-    async def _host_set_phase(self, ws, code, player_id, phase: Phase, *, clear_original=False):
+    async def _host_game(self, ws, code, player_id):
         game = self._registry.get(code)
         if not game:
             await self._err(ws, "game_not_found", "no game with that code")
-            return
+            return None
         if player_id != game.host_id:
             await self._err(ws, "not_host", "only the host can do that")
+            return None
+        return game
+
+    async def _host_set_phase(self, ws, code, player_id, phase: Phase, *, clear_round=False):
+        game = await self._host_game(ws, code, player_id)
+        if not game:
             return
         game.phase = phase
-        if clear_original:
+        if clear_round:
             game.original = None
+            game.attempts = []
+            game.votes = {}
+        self._registry.persist(game)
+        await self._broadcast(code)
+
+    async def _start_audience_recording(self, ws, code, player_id):
+        game = await self._host_game(ws, code, player_id)
+        if not game:
+            return
+        if not game.original:
+            await self._err(ws, "no_original", "record the song first")
+            return
+        game.phase = Phase.AUDIENCE_RECORDING
+        self._registry.persist(game)
+        await self._broadcast(code)
+
+    async def _next_round(self, ws, code, player_id):
+        game = await self._host_game(ws, code, player_id)
+        if not game:
+            return
+        game.reset_for_new_round()
+        self._registry.persist(game)
+        await self._broadcast(code)
+
+    async def _vote(self, ws, code, player_id, attempt_id):
+        game = self._registry.get(code)
+        if not game or player_id not in game.players:
+            await self._err(ws, "not_in_game", "join the game to vote")
+            return
+        if not game.cast_vote(player_id, attempt_id):
+            await self._err(ws, "bad_vote", "you can't vote for that take")
+            return
         self._registry.persist(game)
         await self._broadcast(code)
 
