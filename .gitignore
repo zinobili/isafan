@@ -1,0 +1,16 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node
+web/node_modules/
+web/dist/
+
+# Runtime data — audio + game.json, retained max 24h, never committed
+data/
+
+# Env / local
+.env
+.DS_Store
+Thumbs.db
