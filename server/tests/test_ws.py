@@ -81,6 +81,20 @@ def test_start_audience_recording_requires_original(client):
         assert _recv(host, "game")["game"]["phase"] == "AUDIENCE_RECORDING"
 
 
+def test_reveal_original_toggle(client):
+    with client.websocket_connect("/ws") as host:
+        code, _ = _create(host)
+        host.send_json({"type": "set_reveal_original", "on": True})
+        assert _recv(host, "game")["game"]["revealOriginal"] is True
+        host.send_json({"type": "set_reveal_original", "on": False})
+        assert _recv(host, "game")["game"]["revealOriginal"] is False
+        # a non-host can't flip it
+        with client.websocket_connect("/ws") as p:
+            _join(p, code)
+            p.send_json({"type": "set_reveal_original", "on": True})
+            assert _recv(p, "error")["code"] == "not_host"
+
+
 def test_vote_flow_and_next_round(client):
     with client.websocket_connect("/ws") as host:
         code, _ = _create(host)

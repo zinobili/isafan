@@ -64,6 +64,8 @@ class Game:
     attempts: list[dict] = field(default_factory=list)  # {"id","name","sourceExt","durationMs","by","at"}
     # voter player id -> attempt id (each voter counts once; changeable)
     votes: dict[str, str] = field(default_factory=dict)
+    # host toggle: also let the audience hear the song the right way round
+    reveal_original: bool = False
 
     def audio_url(self, name: str) -> str:
         return f"/api/games/{self.code}/audio/{name}"
@@ -79,7 +81,7 @@ class Game:
 
     @staticmethod
     def new_attempt_id() -> str:
-        return secrets.token_urlsafe(6)
+        return secrets.token_hex(4)  # 8 hex chars: clean filenames, no _ or -
 
     def add_attempt(
         self, *, id: str, name: str, source_ext: str, duration_ms: int, by: str = ""
@@ -124,6 +126,7 @@ class Game:
         self.original = None
         self.attempts = []
         self.votes = {}
+        self.reveal_original = False
         self.phase = Phase.HOST_RECORDING
 
     def add_player(self, name: str, as_host: bool = False) -> Player:
@@ -154,6 +157,7 @@ class Game:
             "original": self.original_public(),
             "attempts": self.attempts_public(),
             "votes": dict(self.votes),
+            "revealOriginal": self.reveal_original,
         }
 
     def to_json(self) -> str:
@@ -168,6 +172,7 @@ class Game:
                 "original": self.original,
                 "attempts": self.attempts,
                 "votes": self.votes,
+                "revealOriginal": self.reveal_original,
                 "players": [
                     {"id": p.id, "name": p.name, "isHost": p.is_host, "joinedAt": p.joined_at}
                     for p in self.players.values()

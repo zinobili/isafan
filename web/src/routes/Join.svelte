@@ -72,6 +72,9 @@
         <h2>Here it is — backwards</h2>
         <p>Listen as many times as you like. You'll sing it back next.</p>
         <PlayClip url={$game.original.url} label="The reversed clip" />
+        {#if $game.revealOriginal}
+          <PlayClip url={$game.original.forwardUrl} label="The original song (forwards)" />
+        {/if}
       </div>
     {:else if $game.phase === "AUDIENCE_RECORDING"}
       {#if iSubmitted && !redoing}

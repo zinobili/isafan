@@ -17,6 +17,7 @@ import tempfile
 import time
 from pathlib import Path
 
+import anyio
 from fastapi import APIRouter, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
@@ -27,8 +28,9 @@ from .storage import Storage
 from .ws import Hub
 
 # The file-input fallback (plain-http LAN pages) uploads whatever the phone's
-# own recorder produces — iOS gives m4a/caf, Android often 3gp/amr. ffmpeg
-# content-sniffs regardless; these maps just keep the stored filename sane.
+# own recorder produces — iOS gives m4a/caf, or a .mov when it opens the video
+# recorder; Android often 3gp/amr. ffmpeg content-sniffs and takes the audio
+# stream regardless; these maps just keep the stored filename sane.
 _EXT_BY_MIME = {
     "audio/webm": "webm",
     "video/webm": "webm",
@@ -36,11 +38,13 @@ _EXT_BY_MIME = {
     "audio/opus": "ogg",
     "audio/mp4": "mp4",
     "video/mp4": "mp4",
+    "video/quicktime": "mov",
     "audio/x-m4a": "m4a",
     "audio/m4a": "m4a",
     "audio/aac": "aac",
     "audio/mpeg": "mp3",
     "audio/3gpp": "3gp",
+    "video/3gpp": "3gp",
     "audio/amr": "amr",
     "audio/x-caf": "caf",
     "audio/wav": "wav",
@@ -53,6 +57,7 @@ _MEDIA_TYPE_BY_EXT = {
     "ogg": "audio/ogg",
     "mp4": "audio/mp4",
     "m4a": "audio/mp4",
+    "mov": "video/quicktime",
     "aac": "audio/aac",
     "mp3": "audio/mpeg",
     "3gp": "audio/3gpp",
@@ -110,8 +115,10 @@ async def _ingest_reversed(
         src.write_bytes(raw)
         out = Path(tmp) / "reversed.wav"
 
+        # ffmpeg is blocking; run it off the event loop so concurrent requests
+        # (e.g. the reveal page loading every clip at once) aren't stalled.
         try:
-            audio.reverse_to_wav(src, out)
+            await anyio.to_thread.run_sync(audio.reverse_to_wav, src, out)
         except audio.FfmpegError:
             raise HTTPException(400, "could not read that file as audio")
 
@@ -129,7 +136,7 @@ async def _ingest_reversed(
         if forward_key:
             fwd = Path(tmp) / "forward.wav"
             try:
-                audio.transcode_to_wav(src, fwd)
+                await anyio.to_thread.run_sync(audio.transcode_to_wav, src, fwd)
                 storage.put_bytes(forward_key, fwd.read_bytes())
             except audio.FfmpegError:
                 pass  # non-fatal — the forward copy is a comparison aid

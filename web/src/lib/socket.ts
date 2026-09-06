@@ -27,6 +27,7 @@ export type GameView = {
   original: OriginalView | null;
   attempts: AttemptView[];
   votes: Record<string, string>; // voterId -> attemptId
+  revealOriginal: boolean; // host let the audience also hear the forward song
 };
 
 export type ConnState = "idle" | "connecting" | "open" | "closed";
@@ -198,6 +199,11 @@ export function startReveal(): void {
 /** Host: clear the round and go back to recording a new song. */
 export function nextRound(): void {
   send({ type: "next_round" });
+}
+
+/** Host: also let the audience play the original (forwards), or not. */
+export function setRevealOriginal(on: boolean): void {
+  send({ type: "set_reveal_original", on });
 }
 
 /** Any player: vote for a take (changeable; not your own). */

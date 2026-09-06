@@ -69,8 +69,8 @@
     }
   }
 
-  function vote(i: number) {
-    votes = votes.map((v, j) => (j === i ? v + 1 : v));
+  function bump(i: number, delta: number) {
+    votes = votes.map((v, j) => (j === i ? Math.max(0, v + delta) : v));
   }
 
   $: topVotes = Math.max(0, ...votes);
@@ -151,9 +151,13 @@
             <div class="row">
               <strong>{a.name}</strong>
               <span class="spacer"></span>
-              <button class="secondary" on:click={() => vote(i)}>
-                Vote{votes[i] ? ` · ${votes[i]}` : ""}
-              </button>
+              <div class="votes">
+                <button class="secondary vbtn" on:click={() => bump(i, -1)} disabled={!votes[i]}>
+                  −
+                </button>
+                <span class="vcount">{votes[i]} {votes[i] === 1 ? "vote" : "votes"}</span>
+                <button class="secondary vbtn" on:click={() => bump(i, 1)}>+</button>
+              </div>
             </div>
             <PlayClip url={a.url} />
           </div>
@@ -181,5 +185,22 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+  .votes {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .vbtn {
+    min-height: 0;
+    padding: 4px 12px;
+    font-size: 1rem;
+    line-height: 1;
+  }
+  .vcount {
+    font-size: 0.8rem;
+    color: var(--muted);
+    min-width: 4.5em;
+    text-align: center;
   }
 </style>

@@ -107,7 +107,7 @@
     <p>{hint}</p>
     <button on:click={begin} disabled={busy}>Start recording</button>
   {:else}
-    <p>In-page recording needs HTTPS. Tap below to record with your phone.</p>
+    <p>In-page recording needs HTTPS, so your phone's own recorder opens instead.</p>
     <label class="filepick" class:disabled={busy}>
       <input
         type="file"
@@ -118,6 +118,11 @@
       />
       🎤 Record audio
     </label>
+    <p class="fine">
+      Your phone may open its <strong>video</strong> recorder — that's fine, record a
+      few seconds. Only the audio is used; the video isn't stored, shown, or used
+      for anything.
+    </p>
   {/if}
 {:else if ui === "warming"}
   <p>Opening the mic…</p>
@@ -162,6 +167,10 @@
   .filepick.disabled {
     opacity: 0.5;
     pointer-events: none;
+  }
+  .fine {
+    font-size: 0.72rem;
+    color: var(--muted);
   }
 
   .rec {

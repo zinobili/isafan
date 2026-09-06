@@ -84,9 +84,9 @@ def test_public_and_json_shapes():
     pub = g.public()
     assert set(pub) == {
         "code", "mode", "phase", "hostId", "roundNo", "createdAt",
-        "players", "original", "attempts", "votes",
+        "players", "original", "attempts", "votes", "revealOriginal",
     }
-    assert pub["original"] is None and pub["attempts"] == []
+    assert pub["original"] is None and pub["attempts"] == [] and pub["revealOriginal"] is False
     parsed = json.loads(g.to_json())
     assert parsed["players"][0]["name"] == "Alice" and "joinedAt" in parsed["players"][0]
 

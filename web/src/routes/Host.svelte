@@ -10,6 +10,7 @@
     startAudienceRecording,
     startReveal,
     nextRound,
+    setRevealOriginal,
     game,
     me,
     lastError,
@@ -130,6 +131,14 @@
         {#if $game.original}
           <PlayClip url={$game.original.url} label="The reversed clip" />
         {/if}
+        <label class="toggle">
+          <input
+            type="checkbox"
+            checked={$game.revealOriginal}
+            on:change={(e) => setRevealOriginal(e.currentTarget.checked)}
+          />
+          Let players also hear the original song (easier)
+        </label>
         <button on:click={startAudienceRecording}>Start the round — everyone records</button>
         <div class="row">
           <button class="secondary" on:click={startSongRecording}>Re-record the song</button>
@@ -218,5 +227,15 @@
     font-size: 0.72rem;
     color: var(--warn);
     text-align: center;
+  }
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .toggle input {
+    width: auto;
   }
 </style>

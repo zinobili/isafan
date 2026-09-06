@@ -13,6 +13,7 @@ client -> server:
   {"type": "start_audience_recording"}   # host: -> AUDIENCE_RECORDING
   {"type": "start_reveal"}               # host: -> REVEAL
   {"type": "next_round"}                 # host: bump round, -> HOST_RECORDING
+  {"type": "set_reveal_original", "on": bool}  # host: audience also hears the forward song
   {"type": "vote", "attemptId": str}     # player: cast / change a vote
 
 server -> client:
@@ -108,6 +109,8 @@ class Hub:
                     await self._host_set_phase(ws, code, player_id, Phase.REVEAL)
                 elif mtype == "next_round":
                     await self._next_round(ws, code, player_id)
+                elif mtype == "set_reveal_original":
+                    await self._set_reveal_original(ws, code, player_id, bool(msg.get("on")))
                 elif mtype == "vote":
                     await self._vote(ws, code, player_id, msg.get("attemptId"))
                 else:
@@ -189,6 +192,7 @@ class Hub:
             game.original = None
             game.attempts = []
             game.votes = {}
+            game.reveal_original = False
         self._registry.persist(game)
         await self._broadcast(code)
 
@@ -208,6 +212,14 @@ class Hub:
         if not game:
             return
         game.reset_for_new_round()
+        self._registry.persist(game)
+        await self._broadcast(code)
+
+    async def _set_reveal_original(self, ws, code, player_id, on: bool):
+        game = await self._host_game(ws, code, player_id)
+        if not game:
+            return
+        game.reveal_original = on
         self._registry.persist(game)
         await self._broadcast(code)
 
