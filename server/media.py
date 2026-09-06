@@ -87,20 +87,23 @@ async def _ingest_reversed(
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / f"src.{ext}"
         src.write_bytes(raw)
+        out = Path(tmp) / "reversed.wav"
 
-        duration = audio.probe_duration_seconds(src)
-        if duration is None:
+        try:
+            audio.reverse_to_wav(src, out)
+        except audio.FfmpegError:
             raise HTTPException(400, "could not read that file as audio")
+
+        # Duration comes from the WAV we just produced, not the upload: browser
+        # MediaRecorder blobs (esp. timesliced webm) often carry no container
+        # duration, but the canonical PCM WAV always does.
+        duration = audio.probe_duration_seconds(out)
+        if not duration:
+            raise HTTPException(400, "recording was empty")
         if duration > settings.max_clip_seconds:
             raise HTTPException(
                 400, f"recording is {duration:.0f}s; limit is {settings.max_clip_seconds}s"
             )
-
-        out = Path(tmp) / "reversed.wav"
-        try:
-            audio.reverse_to_wav(src, out)
-        except audio.FfmpegError as e:
-            raise HTTPException(422, str(e))
 
         storage.put_bytes(f"{source_key}.{ext}", raw)
         storage.put_bytes(reversed_key, out.read_bytes())

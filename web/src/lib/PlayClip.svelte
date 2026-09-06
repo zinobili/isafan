@@ -1,26 +1,22 @@
 <script lang="ts">
-  import { playUrl } from "./audio";
-
   export let url: string;
-  export let label = "Play";
-
-  let playing = false;
-  let error = "";
-
-  async function play() {
-    error = "";
-    playing = true;
-    try {
-      await playUrl(url);
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-    } finally {
-      playing = false;
-    }
-  }
+  export let label = "";
 </script>
 
-<button on:click={play} disabled={playing}>
-  {playing ? "Playing…" : label}
-</button>
-{#if error}<span class="err">{error}</span>{/if}
+<div class="clip">
+  {#if label}<span class="clip-label">{label}</span>{/if}
+  <audio controls preload="metadata" src={url}></audio>
+</div>
+
+<style>
+  .clip {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+  }
+  .clip-label {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+</style>

@@ -9,6 +9,8 @@
   $: p = $path;
 </script>
 
+<div class="brand">Isafan</div>
+
 {#if p === "/" || p.startsWith("/r/")}
   <Join />
 {:else if p === "/host"}
@@ -20,3 +22,14 @@
 {:else}
   <NotFound />
 {/if}
+
+<style>
+  .brand {
+    align-self: center;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    font-size: 1rem;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+</style>

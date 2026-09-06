@@ -92,7 +92,7 @@
 
 <div class="screen">
   <div class="row">
-    <h1>One device</h1>
+    <h1>📱 One device</h1>
     <span class="spacer"></span>
     <button class="secondary" on:click={() => navigate("/")}>Exit</button>
   </div>
@@ -125,14 +125,14 @@
     <div class="panel">
       <h2>Here it is — backwards</h2>
       <p>Play it for everyone a few times.</p>
-      <PlayClip url={originalUrl} label="▶ Play the reversed clip" />
+      <PlayClip url={originalUrl} label="The reversed clip" />
       <button on:click={() => (step = "attempts")}>Everyone's ready — start the round</button>
     </div>
   {:else if step === "attempts"}
     <div class="panel">
       <h2>{current}'s turn</h2>
       <p>Player {idx + 1} of {names.length}. Hear it again, then sing it back.</p>
-      <PlayClip url={originalUrl} label="▶ Hear the reversed clip" />
+      <PlayClip url={originalUrl} label="The reversed clip" />
       {#key idx}
         <RecordControl {busy} useLabel="Keep this take" on:done={onAttempt} />
       {/key}
@@ -144,15 +144,19 @@
       <p>Each take, reversed back. Closest to the original wins.</p>
       <div class="list">
         {#each attempts as a, i}
-          <div class="list-item">
-            <span>{a.name}</span>
-            <span class="spacer"></span>
-            <PlayClip url={a.url} label="▶ Play" />
-            <button class="secondary" on:click={() => vote(i)}>Vote{votes[i] ? ` (${votes[i]})` : ""}</button>
+          <div class="take">
+            <div class="row">
+              <strong>{a.name}</strong>
+              <span class="spacer"></span>
+              <button class="secondary" on:click={() => vote(i)}>
+                Vote{votes[i] ? ` · ${votes[i]}` : ""}
+              </button>
+            </div>
+            <PlayClip url={a.url} />
           </div>
         {/each}
       </div>
-      <PlayClip url={originalUrl} label="▶ Play the original" />
+      <PlayClip url={originalUrl} label="The original" />
       {#if leaders.length}
         <p><strong>{leaders.map((l) => l.name).join(", ")}</strong> {leaders.length > 1 ? "tie" : "wins"}!</p>
       {/if}
@@ -165,3 +169,14 @@
 
   {#if code}<div class="status">game {code}</div>{/if}
 </div>
+
+<style>
+  .take {
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+</style>

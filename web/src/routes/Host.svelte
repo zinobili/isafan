@@ -106,7 +106,7 @@
 <div class="screen">
   {#if $game && $me}
     <div class="row">
-      <h1>Host screen</h1>
+      <h1>👥 Multiplayer</h1>
       <span class="spacer"></span>
       <button class="secondary" on:click={leaveGame}>End</button>
     </div>
@@ -171,7 +171,7 @@
         <h2>Reversed clip is ready</h2>
         <p>Players can now hear it on their phones. Play it here too:</p>
         {#if $game.original}
-          <PlayClip url={$game.original.url} label="▶ Play reversed clip" />
+          <PlayClip url={$game.original.url} label="The reversed clip" />
         {/if}
         <div class="row">
           <button class="secondary" on:click={startRecording}>Re-record the song</button>
@@ -180,7 +180,7 @@
       </div>
     {/if}
   {:else}
-    <h1>Host a game</h1>
+    <h1>👥 Multiplayer</h1>
     <p>Create a room, then share the code with the players on their phones.</p>
     <div class="panel">
       <label>

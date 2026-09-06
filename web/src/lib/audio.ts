@@ -36,7 +36,7 @@ export type Recording = { blob: Blob; mime: string; ext: string };
  * take and get the encoded blob. Rejects if the mic is unavailable or denied
  * (e.g. page not served over HTTPS).
  */
-export async function startRecording(): Promise<{
+export async function startRecording(opts: { onActive?: () => void } = {}): Promise<{
   stop: () => Promise<Recording>;
   cancel: () => void;
 }> {
@@ -52,8 +52,17 @@ export async function startRecording(): Promise<{
   const mime = pickMimeType();
   const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
   const chunks: BlobPart[] = [];
-  rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-  rec.start();
+  let active = false;
+  rec.ondataavailable = (e) => {
+    if (e.data && e.data.size) chunks.push(e.data);
+    if (!active) {
+      active = true;
+      opts.onActive?.(); // first bytes are flowing — safe to start a visible timer
+    }
+  };
+  // Timeslice: Chrome/Firefox flush ~every 250ms. This trims the encoder warm-up
+  // gap and lets callers align their timer with audio that's actually captured.
+  rec.start(250);
 
   const teardown = () => stream.getTracks().forEach((t) => t.stop());
 
