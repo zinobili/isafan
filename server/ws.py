@@ -27,6 +27,15 @@ from fastapi import WebSocket, WebSocketDisconnect
 from .game import GameRegistry, Phase
 
 
+# Latecomers may still join up to the point where the audience starts recording.
+_JOINABLE_PHASES = {
+    Phase.LOBBY,
+    Phase.HOST_RECORDING,
+    Phase.REVERSING,
+    Phase.REVERSED_PLAYBACK,
+}
+
+
 class Hub:
     def __init__(self, registry: GameRegistry) -> None:
         self._registry = registry
@@ -55,6 +64,10 @@ class Hub:
         payload = {"type": "game", "game": game.public()}
         for ws in list(self._conns.get(code, {}).values()):
             await self._send(ws, payload)
+
+    async def broadcast(self, code: str) -> None:
+        """Public: let HTTP handlers push fresh game state after a mutation."""
+        await self._broadcast(code)
 
     # --------------------------------------------------------------- lifecycle
 
@@ -88,6 +101,10 @@ class Hub:
                 elif mtype == "leave":
                     await self._detach(code, player_id, remove=True)
                     code, player_id = None, None
+                elif mtype == "start_recording":
+                    await self._host_set_phase(ws, code, player_id, Phase.HOST_RECORDING, clear_original=True)
+                elif mtype == "reset_round":
+                    await self._host_set_phase(ws, code, player_id, Phase.LOBBY, clear_original=True)
                 else:
                     await self._err(ws, "unknown_type", f"unknown message type: {mtype!r}")
         except WebSocketDisconnect:
@@ -115,8 +132,8 @@ class Hub:
         if not game:
             await self._err(ws, "game_not_found", "no game with that code")
             return cur_code, cur_pid
-        if game.phase is not Phase.LOBBY:
-            await self._err(ws, "game_started", "this game has already started")
+        if game.phase not in _JOINABLE_PHASES:
+            await self._err(ws, "game_started", "this game is already in progress")
             return cur_code, cur_pid
         if len(game.players) >= self._registry.max_players:
             await self._err(ws, "game_full", "this game is full")
@@ -147,6 +164,20 @@ class Hub:
         })
         await self._broadcast(game.code)
         return game.code, pid
+
+    async def _host_set_phase(self, ws, code, player_id, phase: Phase, *, clear_original=False):
+        game = self._registry.get(code)
+        if not game:
+            await self._err(ws, "game_not_found", "no game with that code")
+            return
+        if player_id != game.host_id:
+            await self._err(ws, "not_host", "only the host can do that")
+            return
+        game.phase = phase
+        if clear_original:
+            game.original = None
+        self._registry.persist(game)
+        await self._broadcast(code)
 
     # ------------------------------------------------------------- conn table
 

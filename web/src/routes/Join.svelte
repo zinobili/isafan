@@ -3,6 +3,7 @@
   import { connect, joinGame, leaveGame, game, me, lastError, connState } from "../lib/socket";
   import { navigate, path, codeFromPath } from "../lib/router";
   import Lobby from "../lib/Lobby.svelte";
+  import PlayClip from "../lib/PlayClip.svelte";
 
   let name = "";
   let code = codeFromPath($path);
@@ -27,7 +28,19 @@
       <span class="spacer"></span>
       <button class="secondary" on:click={leaveGame}>Leave</button>
     </div>
-    <p>Waiting for the host to start the game.</p>
+
+    {#if $game.phase === "HOST_RECORDING"}
+      <p>The host is recording the song…</p>
+    {:else if $game.phase === "REVERSED_PLAYBACK" && $game.original}
+      <div class="panel">
+        <h2>Here it is — backwards</h2>
+        <p>Listen as many times as you like. You'll sing it back next.</p>
+        <PlayClip url={$game.original.url} label="▶ Play the reversed clip" />
+      </div>
+    {:else}
+      <p>Waiting for the host to start the game.</p>
+    {/if}
+
     <Lobby />
   </div>
 {:else}

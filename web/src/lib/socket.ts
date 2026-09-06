@@ -7,6 +7,8 @@ export type PlayerView = {
   connected: boolean;
 };
 
+export type OriginalView = { durationMs: number; url: string };
+
 export type GameView = {
   code: string;
   mode: "multi" | "solo";
@@ -15,6 +17,7 @@ export type GameView = {
   roundNo: number;
   createdAt: number;
   players: PlayerView[];
+  original: OriginalView | null;
 };
 
 export type ConnState = "idle" | "connecting" | "open" | "closed";
@@ -169,6 +172,16 @@ export function leaveGame(): void {
   saveSession(null);
   game.set(null);
   me.set(null);
+}
+
+/** Host: move to HOST_RECORDING so the mic UI shows for everyone. */
+export function startRecording(): void {
+  send({ type: "start_recording" });
+}
+
+/** Host: discard the take and go back to the lobby. */
+export function resetRound(): void {
+  send({ type: "reset_round" });
 }
 
 export function sendEcho(payload: unknown): void {

@@ -8,7 +8,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
-from . import __version__
+from . import __version__, audio, media
 from .config import settings
 from .game import GameRegistry
 from .storage import build_storage
@@ -31,7 +31,12 @@ app.add_middleware(
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok", "version": __version__, "games": len(registry.all())}
+    return {
+        "status": "ok",
+        "version": __version__,
+        "games": len(registry.all()),
+        "ffmpeg": audio.ffmpeg_available(),
+    }
 
 
 @app.get("/api/config")
@@ -59,6 +64,9 @@ def game_summary(code: str):
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket) -> None:
     await hub.handle(ws)
+
+
+app.include_router(media.build_router(registry, storage, hub))
 
 
 # --- static SPA (optional; present after `npm run build`) --------------------

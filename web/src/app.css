@@ -130,6 +130,11 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+audio {
+  width: 100%;
 }
 
 .spacer {

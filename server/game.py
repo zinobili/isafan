@@ -62,6 +62,19 @@ class Game:
     players: dict[str, Player] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
     round_no: int = 0
+    # Set once the host's recording has been reversed and stored.
+    original: dict | None = None  # {"durationMs", "uploadedBy", "at"}
+
+    def audio_url(self, name: str) -> str:
+        return f"/api/games/{self.code}/audio/{name}"
+
+    def original_public(self) -> dict | None:
+        if not self.original:
+            return None
+        return {
+            "durationMs": self.original["durationMs"],
+            "url": self.audio_url("original_reversed.wav"),
+        }
 
     def add_player(self, name: str, as_host: bool = False) -> Player:
         pid = secrets.token_urlsafe(9)
@@ -88,6 +101,7 @@ class Game:
             "roundNo": self.round_no,
             "createdAt": self.created_at,
             "players": [p.public() for p in self.players.values()],
+            "original": self.original_public(),
         }
 
     def to_json(self) -> str:
@@ -99,6 +113,7 @@ class Game:
                 "hostId": self.host_id,
                 "createdAt": self.created_at,
                 "roundNo": self.round_no,
+                "original": self.original,
                 "players": [
                     {"id": p.id, "name": p.name, "isHost": p.is_host, "joinedAt": p.joined_at}
                     for p in self.players.values()

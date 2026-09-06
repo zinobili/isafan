@@ -7,18 +7,27 @@ attempt is reversed again so the group can judge who landed closest.
 Architecture, options, and the full roadmap live in the plan doc:
 `~/.claude/plans/i-want-to-create-vectorized-parnas.md`.
 
-## Status — Phase 1 (skeleton)
+## Status — Phase 2 (audio I/O)
 
 Done:
 
-- FastAPI server: `/api/health`, `/api/games/{code}`, `/ws` WebSocket hub.
-- `Storage` abstraction with a local-disk backend (audio + `game.json` land here).
-- In-memory game registry with readable 4-char room codes.
-- Create a game, join by code, live-updating lobby, reconnect/rejoin.
-- Svelte + Vite SPA: `/` join, `/host` host screen with QR code, `/debug` WS check.
+- **Phase 1** — FastAPI server (`/api/health`, `/api/games/{code}`, `/ws`),
+  `Storage` abstraction (local disk), in-memory game registry with readable
+  4-char codes, create/join/live lobby/rejoin, Svelte + Vite SPA
+  (`/` join, `/host`, `/debug`).
+- **Phase 2** — host records the song → `POST /api/games/{code}/original` →
+  server reverses + transcodes to a canonical 16 kHz mono WAV with ffmpeg →
+  players fetch and play it from `GET /api/games/{code}/audio/original_reversed.wav`.
+  Phases `HOST_RECORDING` / `REVERSING` / `REVERSED_PLAYBACK` drive the UI.
+  ffmpeg ships via the `imageio-ffmpeg` dependency — no system install.
 
-Not yet: audio recording/reversal, the round loop, voting, retention task,
-admin portal (Phases 2–7).
+Not yet: the audience recording + reveal loop, single-device mode, voting,
+retention task, admin portal (Phases 3–7).
+
+> The in-app browser blocks microphone capture, so the actual `MediaRecorder`
+> path (record → encode → upload) still needs a check on a real Android phone and
+> a real iPhone — formats differ (webm/opus vs mp4/aac) and the server transcodes
+> both, but only real devices confirm it.
 
 ## Prerequisites
 
