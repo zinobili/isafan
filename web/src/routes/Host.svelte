@@ -13,7 +13,7 @@
     connState,
   } from "../lib/socket";
   import { navigate } from "../lib/router";
-  import { publicBase } from "../lib/config";
+  import { publicConfig } from "../lib/config";
   import { startRecording as micStart, micSupported, type Recording } from "../lib/audio";
   import { uploadOriginal } from "../lib/api";
   import Lobby from "../lib/Lobby.svelte";
@@ -21,7 +21,8 @@
 
   let name = "Host";
   let qr = "";
-  let base = location.origin;
+  let candidates: string[] = [location.origin];
+  let chosen = location.origin;
 
   // local state for the HOST_RECORDING phase
   type Ui = "idle" | "recording" | "preview" | "uploading";
@@ -35,10 +36,13 @@
 
   onMount(async () => {
     connect();
-    base = await publicBase();
+    const cfg = await publicConfig();
+    candidates = cfg.candidates;
+    chosen = cfg.base;
   });
 
-  $: joinUrl = $game ? `${base}/r/${$game.code}` : "";
+  $: joinUrl = $game ? `${chosen}/r/${$game.code}` : "";
+  $: pretty = (u: string) => u.replace(/^https?:\/\//, "");
   $: if (joinUrl) {
     QRCode.toDataURL(joinUrl, { margin: 1, width: 400 })
       .then((d: string) => (qr = d))
@@ -114,6 +118,16 @@
       <p style="text-align:center">
         Open <span class="mono">{joinUrl}</span> on your phone, or scan the code.
       </p>
+      {#if candidates.length > 1}
+        <div class="alts">
+          <span>Phone can't reach it? Try:</span>
+          {#each candidates as c}
+            <button class:active={c === chosen} on:click={() => (chosen = c)}>
+              {pretty(c)}
+            </button>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <Lobby />
@@ -181,3 +195,29 @@
 
   <div class="status">connection: {$connState}</div>
 </div>
+
+<style>
+  .alts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .alts button {
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 0;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    min-height: 0;
+    cursor: pointer;
+  }
+  .alts button.active {
+    background: var(--accent);
+    color: #fff;
+  }
+</style>

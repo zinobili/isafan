@@ -7,6 +7,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from .net import lan_ips
+
 try:  # load a local .env if present; harmless if the package is missing
     from dotenv import load_dotenv
 
@@ -19,9 +21,11 @@ except ImportError:  # pragma: no cover
 class Settings:
     host: str
     port: int
-    public_url: str               # e.g. http://192.168.1.20:8000 or a tunnel URL;
-                                  # used to build the join link / QR. "" = use the
-                                  # origin the host screen was opened with.
+    public_url: str               # join-link / QR base. Explicit ISAFAN_PUBLIC_URL,
+                                  # else an auto-detected LAN address, else "" (use
+                                  # the origin the host screen was opened with).
+    public_url_candidates: tuple[str, ...]  # all reachable bases, best guess first
+    public_url_source: str        # "config" | "detected" | "origin"
     data_dir: Path
     storage_backend: str          # "local" now; "s3" added in a later phase
     game_code_length: int
@@ -44,11 +48,31 @@ def _int(name: str, default: int) -> int:
         return default
 
 
+def _resolve_public_url(port: int) -> tuple[str, tuple[str, ...], str]:
+    """(chosen base, all candidate bases, source). Explicit env wins; otherwise
+    fall back to auto-detected LAN addresses; otherwise empty (client uses its
+    own origin)."""
+    explicit = os.environ.get("ISAFAN_PUBLIC_URL", "").strip().rstrip("/")
+    if explicit:
+        return explicit, (explicit,), "config"
+    try:
+        candidates = tuple(f"http://{ip}:{port}" for ip in lan_ips())
+    except Exception:  # detection must never break startup
+        candidates = ()
+    if candidates:
+        return candidates[0], candidates, "detected"
+    return "", (), "origin"
+
+
 def load_settings() -> Settings:
+    port = _int("ISAFAN_PORT", 8000)
+    public_url, public_url_candidates, public_url_source = _resolve_public_url(port)
     return Settings(
         host=os.environ.get("ISAFAN_HOST", "0.0.0.0"),
-        port=_int("ISAFAN_PORT", 8000),
-        public_url=os.environ.get("ISAFAN_PUBLIC_URL", "").strip().rstrip("/"),
+        port=port,
+        public_url=public_url,
+        public_url_candidates=public_url_candidates,
+        public_url_source=public_url_source,
         data_dir=Path(os.environ.get("ISAFAN_DATA_DIR", "data")),
         storage_backend=os.environ.get("ISAFAN_STORAGE", "local"),
         game_code_length=_int("ISAFAN_CODE_LENGTH", 4),

@@ -20,6 +20,20 @@ hub = Hub(registry)
 
 app = FastAPI(title="isafan", version=__version__)
 
+if settings.public_url:
+    _extra = settings.public_url_candidates[1:]
+    print(
+        f"[isafan] join link base: {settings.public_url}  (source: {settings.public_url_source})"
+        + (f"\n[isafan] other addresses to try: {', '.join(_extra)}" if _extra else ""),
+        flush=True,
+    )
+else:
+    print(
+        "[isafan] join link base: origin of the host screen "
+        "(set ISAFAN_PUBLIC_URL to force a LAN IP or tunnel URL)",
+        flush=True,
+    )
+
 # Only needed while the Vite dev server serves the UI from another origin.
 app.add_middleware(
     CORSMiddleware,
@@ -41,10 +55,14 @@ def health() -> dict:
 
 @app.get("/api/config")
 def client_config() -> dict:
-    """Values the SPA needs at runtime. `publicUrl` is "" unless configured, in
-    which case the host screen builds the join link / QR from it instead of the
-    origin it was opened with."""
-    return {"publicUrl": settings.public_url}
+    """Values the SPA needs at runtime. `publicUrl` is the join-link / QR base
+    (explicit ISAFAN_PUBLIC_URL, else an auto-detected LAN address, else "" so
+    the client uses its own origin). `publicUrlCandidates` lists every reachable
+    base so the host screen can offer alternates when the first can't be reached."""
+    return {
+        "publicUrl": settings.public_url,
+        "publicUrlCandidates": list(settings.public_url_candidates),
+    }
 
 
 @app.get("/api/games/{code}")

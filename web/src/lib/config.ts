@@ -1,16 +1,31 @@
 /**
- * Base URL for links shown to players (the join link and its QR code).
+ * Base URL(s) for links shown to players (the join link and its QR code).
  *
- * Defaults to the origin the page was opened with. If the server has
- * `ISAFAN_PUBLIC_URL` set, that wins — so you can keep the host screen on
- * `localhost` while the QR points at a LAN IP or tunnel URL. Fetched once.
+ * `base` is the server's best guess: an explicit `ISAFAN_PUBLIC_URL`, else an
+ * auto-detected LAN address, else the origin this page was opened with.
+ * `candidates` holds every address the server thinks might work, so the host
+ * screen can offer alternates when a phone can't reach the first one. Fetched
+ * once and cached.
  */
-let cached: Promise<string> | null = null;
+export type PublicConfig = { base: string; candidates: string[] };
+
+const strip = (u: string) => String(u).replace(/\/+$/, "");
+
+let cached: Promise<PublicConfig> | null = null;
+
+export function publicConfig(): Promise<PublicConfig> {
+  cached ??= fetch("/api/config")
+    .then((r) => (r.ok ? r.json() : {}))
+    .then((c: { publicUrl?: string; publicUrlCandidates?: string[] }) => {
+      const base = strip(c.publicUrl || location.origin);
+      const list = Array.isArray(c.publicUrlCandidates) ? c.publicUrlCandidates : [];
+      const candidates = list.length ? list.map(strip) : [base];
+      return { base, candidates };
+    })
+    .catch(() => ({ base: location.origin, candidates: [location.origin] }));
+  return cached;
+}
 
 export function publicBase(): Promise<string> {
-  cached ??= fetch("/api/config")
-    .then((r) => (r.ok ? r.json() : { publicUrl: "" }))
-    .then((c) => String(c.publicUrl || location.origin).replace(/\/+$/, ""))
-    .catch(() => location.origin);
-  return cached;
+  return publicConfig().then((c) => c.base);
 }

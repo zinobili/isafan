@@ -70,26 +70,21 @@ Open <http://localhost:8000>.
 
 ## Play from a phone (same Wi-Fi)
 
-The join link and its QR code default to whatever address the host screen was
-opened with — so `localhost` produces a QR your phone can't reach. Point it at
-this machine's LAN IP instead:
+Just run the server and open <http://localhost:8000/host> on this machine. When
+`ISAFAN_PUBLIC_URL` is unset the server auto-detects this machine's LAN IP and
+builds the QR / join link from it (`http://<lan-ip>:8000/...`); the address it
+chose is printed on startup. Scan it from a phone on the same Wi-Fi.
 
-1. Find the IP: `ipconfig` → the Wi-Fi adapter's IPv4 address (e.g. `192.168.1.20`).
-2. Start the server with that address as the public URL:
-
-   ```bash
-   $env:ISAFAN_PUBLIC_URL = "http://192.168.1.20:8000"
-   .venv\Scripts\python -m server
-   ```
-
-   (or put `ISAFAN_PUBLIC_URL=http://192.168.1.20:8000` in a `.env` file).
-3. Open <http://localhost:8000/host> on this machine — the QR now encodes the LAN
-   address. Scan it from a phone on the same Wi-Fi.
+If the phone can't reach that address, the host screen shows a "Phone can't
+reach it? Try:" row under the QR — tap another detected address (e.g. when a VPN
+adapter was picked first) and the QR updates. Or pin one yourself:
+`ISAFAN_PUBLIC_URL=http://192.168.1.20:8000` in a `.env` file (also how you'd
+point it at a tunnel URL).
 
 Notes: Windows Firewall may prompt to allow port 8000 (allow it for Private
 networks). A VPN on this machine can block phone↔PC LAN traffic. Microphone
-recording (Phase 2+) needs HTTPS, so a same-Wi-Fi `http://` setup is only good
-for the join/lobby flow — use a tunnel for the full game.
+recording needs HTTPS, so a same-Wi-Fi `http://` setup only covers the
+join/lobby flow — use a tunnel for the full game.
 
 ## Configuration
 
