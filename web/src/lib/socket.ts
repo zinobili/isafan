@@ -7,7 +7,7 @@ export type PlayerView = {
   connected: boolean;
 };
 
-export type OriginalView = { durationMs: number; url: string };
+export type OriginalView = { durationMs: number; url: string; forwardUrl: string };
 export type AttemptView = { id: string; name: string; durationMs: number; url: string };
 
 export type GameView = {

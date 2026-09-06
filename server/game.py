@@ -75,7 +75,8 @@ class Game:
             return None
         return {
             "durationMs": self.original["durationMs"],
-            "url": self.audio_url("original_reversed.wav"),
+            "url": self.audio_url("original_reversed.wav"),      # what players mimic
+            "forwardUrl": self.audio_url("original_forward.wav"),  # the song as sung
         }
 
     @staticmethod

@@ -27,9 +27,11 @@
   .brand {
     align-self: center;
     font-weight: 800;
-    letter-spacing: 0.22em;
-    font-size: 1rem;
-    color: var(--text);
-    margin-bottom: 10px;
+    font-size: clamp(1.9rem, 8vw, 2.6rem);
+    letter-spacing: 0.28em;
+    padding-left: 0.28em; /* balance the trailing letter-spacing */
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 4px 0 18px;
   }
 </style>

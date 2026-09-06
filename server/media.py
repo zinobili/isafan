@@ -72,9 +72,17 @@ def _ext_for(file: UploadFile) -> str:
 
 
 async def _ingest_reversed(
-    file: UploadFile, code: str, storage: Storage, *, source_key: str, reversed_key: str
+    file: UploadFile,
+    code: str,
+    storage: Storage,
+    *,
+    source_key: str,
+    reversed_key: str,
+    forward_key: str | None = None,
 ) -> tuple[float, str]:
-    """Read an upload, store it, produce + store its reversed WAV. Returns
+    """Read an upload, store it, produce + store its reversed WAV (and, if
+    `forward_key` is given, a non-reversed WAV too — used so the reveal screen
+    can play the original the way it was actually sung). Returns
     (duration_seconds, source_ext)."""
     if not audio.ffmpeg_available():
         raise HTTPException(503, "audio processing unavailable (ffmpeg missing)")
@@ -108,6 +116,14 @@ async def _ingest_reversed(
         storage.put_bytes(f"{source_key}.{ext}", raw)
         storage.put_bytes(reversed_key, out.read_bytes())
 
+        if forward_key:
+            fwd = Path(tmp) / "forward.wav"
+            try:
+                audio.transcode_to_wav(src, fwd)
+                storage.put_bytes(forward_key, fwd.read_bytes())
+            except audio.FfmpegError:
+                pass  # non-fatal — the forward copy is a comparison aid
+
     return duration, ext
 
 
@@ -126,6 +142,7 @@ def build_router(registry: GameRegistry, storage: Storage, hub: Hub) -> APIRoute
             file, code, storage,
             source_key=f"games/{code}/original_source",
             reversed_key=f"games/{code}/original_reversed.wav",
+            forward_key=f"games/{code}/original_forward.wav",
         )
         game.original = {
             "durationMs": round(duration * 1000),
@@ -173,7 +190,7 @@ def build_router(registry: GameRegistry, storage: Storage, hub: Hub) -> APIRoute
 
     @router.get("/audio/{name}")
     def get_audio(code: str, name: str):
-        if name == "original_reversed.wav" or (
+        if name in ("original_reversed.wav", "original_forward.wav") or (
             name.startswith("original_source.") and name.split(".")[-1] in _SOURCE_EXTS
         ):
             key = f"games/{code}/{name}"

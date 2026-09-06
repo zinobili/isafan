@@ -14,7 +14,7 @@ async function post(url: string, body: FormData | undefined) {
   return res.json();
 }
 
-export type OriginalResult = { durationMs: number; url: string };
+export type OriginalResult = { durationMs: number; url: string; forwardUrl: string };
 export type AttemptResult = { id: string; name: string; durationMs: number; url: string };
 
 /** Create a one-device (pass-the-phone) game. Returns its code. */

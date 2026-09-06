@@ -10,7 +10,8 @@
 
   let names: string[] = ["", ""];
   let code = "";
-  let originalUrl = "";
+  let originalUrl = ""; // reversed — what players mimic
+  let originalForwardUrl = ""; // the song as sung — for comparison at the reveal
   let attempts: { name: string; url: string }[] = [];
   let idx = 0;
   let votes: number[] = [];
@@ -39,7 +40,9 @@
     err = "";
     try {
       code = (await createSolo()).code;
-      originalUrl = (await uploadOriginal(code, "", e.detail.recording)).url;
+      const r = await uploadOriginal(code, "", e.detail.recording);
+      originalUrl = r.url;
+      originalForwardUrl = r.forwardUrl;
       step = "listen";
     } catch (x) {
       err = x instanceof Error ? x.message : String(x);
@@ -77,6 +80,7 @@
   function playAgain() {
     code = "";
     originalUrl = "";
+    originalForwardUrl = "";
     attempts = [];
     idx = 0;
     votes = [];
@@ -156,7 +160,7 @@
           </div>
         {/each}
       </div>
-      <PlayClip url={originalUrl} label="The original" />
+      <PlayClip url={originalForwardUrl || originalUrl} label="The original song — how it should sound" />
       {#if leaders.length}
         <p><strong>{leaders.map((l) => l.name).join(", ")}</strong> {leaders.length > 1 ? "tie" : "wins"}!</p>
       {/if}
