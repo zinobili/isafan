@@ -1,4 +1,5 @@
-"""ffmpeg wrappers: probe duration, reverse + transcode to a canonical WAV.
+"""ffmpeg wrappers: reverse + transcode to a canonical WAV, plus a WAV-header
+duration read (no subprocess).
 
 The ffmpeg binary is resolved once, in order:
   1. ISAFAN_FFMPEG (explicit path)
@@ -8,15 +9,14 @@ The ffmpeg binary is resolved once, in order:
 
 from __future__ import annotations
 
-import re
 import shutil
 import subprocess
+import wave
 from functools import lru_cache
 from pathlib import Path
 
 from .config import settings
 
-_DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
 _FFMPEG_TIMEOUT = 90  # seconds; clips are short, this is just a safety net
 
 
@@ -59,30 +59,25 @@ def _run(args: list[str]) -> subprocess.CompletedProcess:
     )
 
 
-def probe_duration_seconds(src: Path) -> float | None:
-    """Parse the container duration from ffmpeg's report. Returns None if the
-    file can't be read as media."""
-    proc = _run(["-i", str(src)])
-    text = proc.stderr.decode("utf-8", "replace")
-    m = _DURATION_RE.search(text)
-    if not m:
+def wav_duration_seconds(path: Path) -> float | None:
+    """Exact duration of a PCM WAV from its header. `None` if it can't be read
+    or holds no audio. Use this on our own transcoded output — browser
+    MediaRecorder blobs often carry no container duration, but a PCM WAV always
+    does, and reading the header needs no subprocess."""
+    try:
+        with wave.open(str(path), "rb") as w:
+            frames, rate = w.getnframes(), w.getframerate()
+    except (wave.Error, OSError, EOFError):
         return None
-    h, mnt, sec = m.groups()
-    return int(h) * 3600 + int(mnt) * 60 + float(sec)
+    return frames / rate if rate and frames else None
 
 
 def _to_wav(src: Path, dst: Path, *, reverse: bool) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
-    filters = ["areverse"] if reverse else []
     args = ["-y", "-i", str(src)]
-    if filters:
-        args += ["-af", ",".join(filters)]
-    args += [
-        "-ac", "1",
-        "-ar", str(settings.audio_sample_rate),
-        "-c:a", "pcm_s16le",
-        str(dst),
-    ]
+    if reverse:
+        args += ["-af", "areverse"]
+    args += ["-ac", "1", "-ar", str(settings.audio_sample_rate), "-c:a", "pcm_s16le", str(dst)]
     proc = _run(args)
     if proc.returncode != 0 or not dst.exists():
         tail = proc.stderr.decode("utf-8", "replace").strip().splitlines()[-4:]

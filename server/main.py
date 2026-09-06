@@ -104,14 +104,14 @@ def api_not_found(_rest: str):
 
 # --- static SPA (optional; present after `npm run build`) --------------------
 
-_STATIC = settings.static_dir
+_STATIC = settings.static_dir.resolve()
 _INDEX = _STATIC / "index.html"
 
 if _INDEX.is_file():
 
     @app.get("/{full_path:path}")
     def spa(full_path: str):
-        candidate = _STATIC / full_path
-        if full_path and candidate.is_file() and _STATIC.resolve() in candidate.resolve().parents:
+        candidate = (_STATIC / full_path).resolve()
+        if full_path and candidate.is_file() and _STATIC in candidate.parents:
             return FileResponse(candidate)
         return FileResponse(_INDEX)

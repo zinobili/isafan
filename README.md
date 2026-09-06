@@ -62,7 +62,7 @@ npm --prefix web run dev
 ```
 
 Open <http://localhost:5173>. Host a game in one tab, join from another with the
-code (or open `/debug` to exercise the WebSocket directly).
+code.
 
 ## Run — single process (what phones will hit)
 
@@ -91,6 +91,18 @@ networks). A VPN on this machine can block phone↔PC LAN traffic. Microphone
 recording needs HTTPS, so a same-Wi-Fi `http://` setup only covers the
 join/lobby flow — use a tunnel for the full game.
 
+## Tests
+
+```bash
+.venv\Scripts\python -m pip install -r server/requirements-dev.txt
+.venv\Scripts\python -m pytest          # server: game model, storage, audio, ws + http endpoints
+npm --prefix web run check              # web: svelte-check
+```
+
+The server tests synthesize tiny audio clips with the bundled ffmpeg and drive
+the API/WebSocket through Starlette's `TestClient`; they use an isolated temp
+data dir (no `./data` writes).
+
 ## Configuration
 
 All optional — see `.env.example`. Read at startup from the environment or a
@@ -100,7 +112,8 @@ local `.env` file. Notable: `ISAFAN_PUBLIC_URL` (join-link / QR base address),
 ## Layout
 
 ```
-server/   FastAPI app — config, storage, game model, ws hub, entrypoint
-web/      Svelte + Vite SPA — routes/, lib/ (socket client, router, lobby)
-data/     runtime only (gitignored): per-game folders, game.json
+server/   FastAPI app — config, storage, game model, ws hub, audio, entrypoint
+server/tests/   pytest suite
+web/      Svelte + Vite SPA — routes/, lib/ (socket client, router, components)
+data/     runtime only (gitignored): per-game folders, game.json + audio clips
 ```

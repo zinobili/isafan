@@ -5,7 +5,7 @@
     connect,
     createGame,
     leaveGame,
-    startRecording,
+    startSongRecording,
     resetRound,
     startAudienceRecording,
     startReveal,
@@ -17,10 +17,11 @@
   } from "../lib/socket";
   import { navigate } from "../lib/router";
   import { publicConfig } from "../lib/config";
-  import { startRecording as micStart, micSupported, type Recording } from "../lib/audio";
   import { uploadOriginal } from "../lib/api";
+  import type { Recording } from "../lib/audio";
   import Lobby from "../lib/Lobby.svelte";
   import PlayClip from "../lib/PlayClip.svelte";
+  import RecordControl from "../lib/RecordControl.svelte";
   import RevealPanel from "../lib/RevealPanel.svelte";
 
   let name = "Host";
@@ -28,14 +29,8 @@
   let candidates: string[] = [location.origin];
   let chosen = location.origin;
 
-  // local state for the HOST_RECORDING phase
-  type Ui = "idle" | "recording" | "preview" | "uploading";
-  let ui: Ui = "idle";
-  let handle: Awaited<ReturnType<typeof micStart>> | null = null;
-  let take: Recording | null = null;
-  let takeUrl = "";
-  let elapsed = 0;
-  let timer: ReturnType<typeof setInterval> | null = null;
+  // HOST_RECORDING upload state
+  let busy = false;
   let err = "";
 
   onMount(async () => {
@@ -45,65 +40,27 @@
     chosen = cfg.base;
   });
 
+  const pretty = (u: string) => u.replace(/^https?:\/\//, "");
+
   $: joinUrl = $game ? `${chosen}/r/${$game.code}` : "";
-  $: pretty = (u: string) => u.replace(/^https?:\/\//, "");
   $: if (joinUrl) {
     QRCode.toDataURL(joinUrl, { margin: 1, width: 400 })
       .then((d: string) => (qr = d))
       .catch(() => (qr = ""));
   }
-  // reset local recorder state whenever we (re-)enter the recording phase
-  $: if ($game?.phase === "HOST_RECORDING" && ui !== "recording" && ui !== "preview" && ui !== "uploading") {
-    clearTake();
-  }
 
-  function clearTake() {
-    if (takeUrl) URL.revokeObjectURL(takeUrl);
-    take = null;
-    takeUrl = "";
-    elapsed = 0;
-    err = "";
-    ui = "idle";
-  }
-
-  async function beginRecording() {
+  async function onSongTake(e: CustomEvent<{ recording: Recording }>) {
+    if (!$game || !$me) return;
+    busy = true;
     err = "";
     try {
-      handle = await micStart();
-      ui = "recording";
-      elapsed = 0;
-      timer = setInterval(() => (elapsed += 1), 1000);
-    } catch (e) {
-      err = e instanceof Error ? e.message : String(e);
+      await uploadOriginal($game.code, $me.id, e.detail.recording);
+      // server broadcasts phase REVERSED_PLAYBACK
+    } catch (x) {
+      err = x instanceof Error ? x.message : String(x);
+    } finally {
+      busy = false;
     }
-  }
-
-  async function stopRecording() {
-    if (timer) clearInterval(timer);
-    timer = null;
-    if (!handle) return;
-    take = await handle.stop();
-    handle = null;
-    takeUrl = URL.createObjectURL(take.blob);
-    ui = "preview";
-  }
-
-  async function submit() {
-    if (!take || !$game || !$me) return;
-    ui = "uploading";
-    err = "";
-    try {
-      await uploadOriginal($game.code, $me.id, take);
-      // server broadcasts phase REVERSED_PLAYBACK; local state resets on next enter
-      clearTake();
-    } catch (e) {
-      err = e instanceof Error ? e.message : String(e);
-      ui = "preview";
-    }
-  }
-
-  function fmt(s: number) {
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   }
 
   // --- AUDIENCE_RECORDING: who still owes a take (everyone but the singer) ---
@@ -150,34 +107,13 @@
       <div class="panel">
         <h2>The song</h2>
         <p>One person sings a line or two. Everyone else will hear it backwards.</p>
-        <button on:click={startRecording}>Record the song</button>
+        <button on:click={startSongRecording}>Record the song</button>
       </div>
     {:else if $game.phase === "HOST_RECORDING"}
       <div class="panel">
         <h2>Record the song</h2>
-        {#if !micSupported()}
-          <span class="err">
-            This browser can't record audio. Use Chrome/Safari on an HTTPS page.
-          </span>
-        {/if}
-
-        {#if ui === "idle"}
-          <p>Tap to start, sing, then tap stop.</p>
-          <button on:click={beginRecording} disabled={!micSupported()}>Start recording</button>
-        {:else if ui === "recording"}
-          <p>Recording… <strong>{fmt(elapsed)}</strong></p>
-          <button on:click={stopRecording}>Stop</button>
-        {:else if ui === "preview"}
-          <p>Listen back, then send it — or record again.</p>
-          <audio controls src={takeUrl}></audio>
-          <div class="row">
-            <button on:click={submit}>Use this take</button>
-            <button class="secondary" on:click={beginRecording}>Redo</button>
-          </div>
-        {:else if ui === "uploading"}
-          <p>Reversing…</p>
-        {/if}
-
+        <p>Sing a line or two, listen back, then send it.</p>
+        <RecordControl {busy} useLabel="Use this take" on:done={onSongTake} />
         {#if err}<span class="err">{err}</span>{/if}
       </div>
     {:else if $game.phase === "REVERSED_PLAYBACK"}
@@ -189,7 +125,7 @@
         {/if}
         <button on:click={startAudienceRecording}>Start the round — everyone records</button>
         <div class="row">
-          <button class="secondary" on:click={startRecording}>Re-record the song</button>
+          <button class="secondary" on:click={startSongRecording}>Re-record the song</button>
           <button class="secondary" on:click={resetRound}>Back to lobby</button>
         </div>
       </div>

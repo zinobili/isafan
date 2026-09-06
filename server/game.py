@@ -22,14 +22,10 @@ MAX_NAME_LEN = 24
 
 class Phase(str, Enum):
     LOBBY = "LOBBY"
-    HOST_RECORDING = "HOST_RECORDING"
-    REVERSING = "REVERSING"
-    REVERSED_PLAYBACK = "REVERSED_PLAYBACK"
-    AUDIENCE_RECORDING = "AUDIENCE_RECORDING"
-    PROCESSING = "PROCESSING"
-    REVEAL = "REVEAL"
-    VOTE = "VOTE"
-    RESULTS = "RESULTS"
+    HOST_RECORDING = "HOST_RECORDING"          # host is taking the song
+    REVERSED_PLAYBACK = "REVERSED_PLAYBACK"    # everyone hears it backwards
+    AUDIENCE_RECORDING = "AUDIENCE_RECORDING"  # players record their mimic
+    REVEAL = "REVEAL"                          # play the takes forwards + vote
 
 
 @dataclass
@@ -132,7 +128,7 @@ class Game:
 
     def add_player(self, name: str, as_host: bool = False) -> Player:
         pid = secrets.token_urlsafe(9)
-        player = Player(id=pid, name=_clean_name(name), is_host=as_host)
+        player = Player(id=pid, name=_clean_name(name))
         self.players[pid] = player
         if as_host and self.host_id is None:
             self.host_id = pid

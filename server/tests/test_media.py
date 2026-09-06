@@ -1,0 +1,103 @@
+"""HTTP audio endpoints. Game state is set up directly on the registry — the
+WebSocket path that normally drives phases is covered in test_ws.py."""
+
+from server.game import Phase
+from server.main import registry
+
+
+def _files(webm: bytes):
+    return {"file": ("take.webm", webm, "audio/webm")}
+
+
+def test_health_and_config(client):
+    h = client.get("/api/health").json()
+    assert h["status"] == "ok" and h["ffmpeg"] is True
+    cfg = client.get("/api/config").json()
+    assert cfg["publicUrl"] == "http://testhost:8000"
+
+
+def test_api_miss_is_json_404_not_spa(client):
+    r = client.get("/api/nope")
+    assert r.status_code == 404 and r.json() == {"detail": "not found"}
+
+
+def test_solo_create(client):
+    code = client.post("/api/solo").json()["code"]
+    assert registry.get(code).mode == "solo"
+
+
+def test_original_host_only(client, webm_bytes):
+    g = registry.create("multi")
+    host = g.add_player("H", as_host=True)
+    g.add_player("P")
+
+    r = client.post(f"/api/games/{g.code}/original", files=_files(webm_bytes),
+                    data={"playerId": "not-host"})
+    assert r.status_code == 403
+
+    r = client.post(f"/api/games/{g.code}/original", files=_files(webm_bytes),
+                    data={"playerId": host.id})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["url"].endswith("original_reversed.wav")
+    assert body["forwardUrl"].endswith("original_forward.wav")
+    assert registry.get(g.code).phase is Phase.REVERSED_PLAYBACK
+
+
+def test_original_rejects_non_audio(client):
+    g = registry.create("multi")
+    host = g.add_player("H", as_host=True)
+    r = client.post(f"/api/games/{g.code}/original",
+                    files={"file": ("x.webm", b"junk", "audio/webm")},
+                    data={"playerId": host.id})
+    assert r.status_code == 400
+
+
+def test_original_rejects_too_long(client, webm_long):
+    g = registry.create("solo")  # conftest sets the clip limit to 5s
+    r = client.post(f"/api/games/{g.code}/original", files=_files(webm_long), data={"playerId": ""})
+    assert r.status_code == 400 and "limit" in r.json()["detail"]
+
+
+def test_attempts_multi_phase_gate_and_replace(client, webm_bytes):
+    g = registry.create("multi")
+    g.add_player("H", as_host=True)
+    p = g.add_player("Ada")
+    g.original = {"durationMs": 1000}
+
+    # round not open yet
+    r = client.post(f"/api/games/{g.code}/attempts", files=_files(webm_bytes),
+                    data={"name": "Ada", "playerId": p.id})
+    assert r.status_code == 409
+
+    g.phase = Phase.AUDIENCE_RECORDING
+    r1 = client.post(f"/api/games/{g.code}/attempts", files=_files(webm_bytes),
+                     data={"name": "Ada", "playerId": p.id})
+    assert r1.status_code == 200
+    first_id = r1.json()["id"]
+
+    r2 = client.post(f"/api/games/{g.code}/attempts", files=_files(webm_bytes),
+                     data={"name": "Ada", "playerId": p.id})
+    assert r2.status_code == 200 and r2.json()["id"] != first_id
+    assert len(registry.get(g.code).attempts) == 1          # replaced, not appended
+    # old reversed clip is gone
+    assert client.get(f"/api/games/{g.code}/audio/attempt_{first_id}_reversed.wav").status_code == 404
+
+
+def test_attempts_unknown_player_rejected(client, webm_bytes):
+    g = registry.create("multi")
+    g.add_player("H", as_host=True)
+    g.original = {"durationMs": 1000}
+    g.phase = Phase.AUDIENCE_RECORDING
+    r = client.post(f"/api/games/{g.code}/attempts", files=_files(webm_bytes),
+                    data={"name": "Ghost", "playerId": "nobody"})
+    assert r.status_code == 403
+
+
+def test_audio_allowlist_and_traversal(client, webm_bytes):
+    g = registry.create("solo")
+    client.post(f"/api/games/{g.code}/original", files=_files(webm_bytes), data={"playerId": ""})
+
+    assert client.get(f"/api/games/{g.code}/audio/original_reversed.wav").status_code == 200
+    for bad in ("game.json", "original_source.exe", "../../etc/passwd", "attempt_x_reversed.mp3"):
+        assert client.get(f"/api/games/{g.code}/audio/{bad}").status_code == 404

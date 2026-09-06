@@ -35,8 +35,6 @@ export const connState = writable<ConnState>("idle");
 export const game = writable<GameView | null>(null);
 export const me = writable<{ id: string; code: string } | null>(null);
 export const lastError = writable<string | null>(null);
-/** Rolling log of echo replies — used by the /debug screen. */
-export const echoLog = writable<string[]>([]);
 
 const LS_KEY = "isafan.session";
 
@@ -143,12 +141,6 @@ function handle(msg: any): void {
     case "game":
       game.set(msg.game);
       break;
-    case "echo":
-      echoLog.update((l) => [
-        `${new Date().toLocaleTimeString()}  ${JSON.stringify(msg.payload)}`,
-        ...l,
-      ].slice(0, 20));
-      break;
     case "error":
       lastError.set(msg.message ?? msg.code ?? "unknown error");
       if (msg.code === "game_not_found") {
@@ -183,12 +175,12 @@ export function leaveGame(): void {
   me.set(null);
 }
 
-/** Host: move to HOST_RECORDING so the mic UI shows for everyone. */
-export function startRecording(): void {
+/** Host: move to HOST_RECORDING (recorder UI shows) and clear any prior round. */
+export function startSongRecording(): void {
   send({ type: "start_recording" });
 }
 
-/** Host: discard the take and go back to the lobby. */
+/** Host: discard the round and go back to the lobby. */
 export function resetRound(): void {
   send({ type: "reset_round" });
 }
@@ -211,13 +203,4 @@ export function nextRound(): void {
 /** Any player: vote for a take (changeable; not your own). */
 export function castVote(attemptId: string): void {
   send({ type: "vote", attemptId });
-}
-
-export function sendEcho(payload: unknown): void {
-  connect();
-  send({ type: "echo", payload });
-}
-
-export function hasSession(): boolean {
-  return session !== null;
 }

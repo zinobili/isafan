@@ -1,20 +1,24 @@
-"""WebSocket hub: connection lifecycle + lobby fan-out.
+"""WebSocket hub: connection lifecycle + game-state fan-out.
 
 Message protocol (JSON text frames).
 
 client -> server:
   {"type": "ping"}
-  {"type": "echo", "payload": <any>}                 # Phase 1 round-trip check
-  {"type": "create", "name": str, "mode": "multi"}
+  {"type": "create", "name": str, "mode": "multi"|"solo"}
   {"type": "join",   "code": str, "name": str}
   {"type": "rejoin", "code": str, "playerId": str}   # after a reconnect
   {"type": "leave"}
+  {"type": "start_recording"}            # host: -> HOST_RECORDING, clear round
+  {"type": "reset_round"}                # host: -> LOBBY, clear round
+  {"type": "start_audience_recording"}   # host: -> AUDIENCE_RECORDING
+  {"type": "start_reveal"}               # host: -> REVEAL
+  {"type": "next_round"}                 # host: bump round, -> HOST_RECORDING
+  {"type": "vote", "attemptId": str}     # player: cast / change a vote
 
 server -> client:
   {"type": "pong"}
-  {"type": "echo", "payload": <any>}
   {"type": "joined", "playerId": str, "code": str, "game": <GameView>}
-  {"type": "game", "game": <GameView>}               # broadcast on any change
+  {"type": "game", "game": <GameView>}   # broadcast on any change
   {"type": "error", "code": str, "message": str}
 """
 
@@ -28,12 +32,7 @@ from .game import GameRegistry, Phase
 
 
 # Latecomers may still join up to the point where the audience starts recording.
-_JOINABLE_PHASES = {
-    Phase.LOBBY,
-    Phase.HOST_RECORDING,
-    Phase.REVERSING,
-    Phase.REVERSED_PLAYBACK,
-}
+_JOINABLE_PHASES = {Phase.LOBBY, Phase.HOST_RECORDING, Phase.REVERSED_PLAYBACK}
 
 
 class Hub:
@@ -90,8 +89,6 @@ class Hub:
                 mtype = msg.get("type")
                 if mtype == "ping":
                     await self._send(ws, {"type": "pong"})
-                elif mtype == "echo":
-                    await self._send(ws, {"type": "echo", "payload": msg.get("payload")})
                 elif mtype == "create":
                     code, player_id = await self._create(ws, msg, code, player_id)
                 elif mtype == "join":

@@ -22,7 +22,7 @@ from fastapi.responses import FileResponse
 
 from . import audio
 from .config import settings
-from .game import Game, GameRegistry, Phase
+from .game import GameRegistry, Phase
 from .storage import Storage
 from .ws import Hub
 
@@ -102,10 +102,7 @@ async def _ingest_reversed(
         except audio.FfmpegError:
             raise HTTPException(400, "could not read that file as audio")
 
-        # Duration comes from the WAV we just produced, not the upload: browser
-        # MediaRecorder blobs (esp. timesliced webm) often carry no container
-        # duration, but the canonical PCM WAV always does.
-        duration = audio.probe_duration_seconds(out)
+        duration = audio.wav_duration_seconds(out)
         if not duration:
             raise HTTPException(400, "recording was empty")
         if duration > settings.max_clip_seconds:
@@ -167,7 +164,7 @@ def build_router(registry: GameRegistry, storage: Storage, hub: Hub) -> APIRoute
 
         if game.mode == "solo":
             # pass-the-phone: takes append, phase advances leniently
-            if game.phase in (Phase.LOBBY, Phase.HOST_RECORDING, Phase.REVERSING, Phase.REVERSED_PLAYBACK):
+            if game.phase is not Phase.AUDIENCE_RECORDING:
                 game.phase = Phase.AUDIENCE_RECORDING
         else:
             if playerId not in game.players:

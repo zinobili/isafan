@@ -70,8 +70,7 @@
   }
 
   function vote(i: number) {
-    votes[i] += 1;
-    votes = votes;
+    votes = votes.map((v, j) => (j === i ? v + 1 : v));
   }
 
   $: topVotes = Math.max(0, ...votes);

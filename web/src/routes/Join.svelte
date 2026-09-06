@@ -93,7 +93,7 @@
           {#if recErr}<span class="err">{recErr}</span>{/if}
         </div>
       {/if}
-    {:else if $game.phase === "REVEAL" || $game.phase === "VOTE"}
+    {:else if $game.phase === "REVEAL"}
       <div class="panel">
         <h2>Vote for the closest</h2>
         <RevealPanel

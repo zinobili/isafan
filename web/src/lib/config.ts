@@ -25,7 +25,3 @@ export function publicConfig(): Promise<PublicConfig> {
     .catch(() => ({ base: location.origin, candidates: [location.origin] }));
   return cached;
 }
-
-export function publicBase(): Promise<string> {
-  return publicConfig().then((c) => c.base);
-}

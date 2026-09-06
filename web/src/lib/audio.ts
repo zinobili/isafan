@@ -1,4 +1,4 @@
-/** Microphone capture (MediaRecorder) + simple clip playback. */
+/** Microphone capture via MediaRecorder. */
 
 const MIME_CANDIDATES = [
   "audio/webm;codecs=opus",
@@ -8,10 +8,18 @@ const MIME_CANDIDATES = [
   "audio/ogg;codecs=opus",
 ];
 
-export function pickMimeType(): string | undefined {
+function pickMimeType(): string | undefined {
   const MR = window.MediaRecorder;
   if (!MR || !MR.isTypeSupported) return undefined;
   return MIME_CANDIDATES.find((t) => MR.isTypeSupported(t));
+}
+
+function extForMime(mime: string): string {
+  if (mime.includes("webm")) return "webm";
+  if (mime.includes("mp4")) return "mp4";
+  if (mime.includes("aac")) return "aac";
+  if (mime.includes("ogg")) return "ogg";
+  return "bin";
 }
 
 export function micSupported(): boolean {
@@ -21,20 +29,14 @@ export function micSupported(): boolean {
   );
 }
 
-export function extForMime(mime: string): string {
-  if (mime.includes("webm")) return "webm";
-  if (mime.includes("mp4")) return "mp4";
-  if (mime.includes("aac")) return "aac";
-  if (mime.includes("ogg")) return "ogg";
-  return "bin";
-}
-
 export type Recording = { blob: Blob; mime: string; ext: string };
 
 /**
- * Start recording. Resolves with a handle exposing `stop()`; call it to end the
- * take and get the encoded blob. Rejects if the mic is unavailable or denied
- * (e.g. page not served over HTTPS).
+ * Start recording. Resolves with a handle: `stop()` ends the take and returns
+ * the encoded blob, `cancel()` discards it. Rejects if the mic is unavailable
+ * or denied (e.g. the page isn't served over HTTPS). `onActive` fires once the
+ * first audio bytes are flowing, so callers can start a timer aligned to real
+ * captured audio rather than the encoder warm-up.
  */
 export async function startRecording(opts: { onActive?: () => void } = {}): Promise<{
   stop: () => Promise<Recording>;
@@ -57,12 +59,10 @@ export async function startRecording(opts: { onActive?: () => void } = {}): Prom
     if (e.data && e.data.size) chunks.push(e.data);
     if (!active) {
       active = true;
-      opts.onActive?.(); // first bytes are flowing — safe to start a visible timer
+      opts.onActive?.();
     }
   };
-  // Timeslice: Chrome/Firefox flush ~every 250ms. This trims the encoder warm-up
-  // gap and lets callers align their timer with audio that's actually captured.
-  rec.start(250);
+  rec.start(250); // timeslice: flush ~every 250ms so onActive fires promptly
 
   const teardown = () => stream.getTracks().forEach((t) => t.stop());
 
@@ -85,14 +85,4 @@ export async function startRecording(opts: { onActive?: () => void } = {}): Prom
       teardown();
     },
   };
-}
-
-/** Play a URL to completion; resolves when it ends (or rejects on error). */
-export function playUrl(url: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const el = new Audio(url);
-    el.onended = () => resolve();
-    el.onerror = () => reject(new Error("could not play the clip"));
-    el.play().catch(reject);
-  });
 }

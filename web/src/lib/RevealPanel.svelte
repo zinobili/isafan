@@ -12,12 +12,14 @@
 
   const dispatch = createEventDispatcher<{ vote: string }>();
 
-  $: tally = (() => {
+  function countVotes(atts: AttemptView[], v: Record<string, string>): Record<string, number> {
     const t: Record<string, number> = {};
-    for (const a of attempts) t[a.id] = 0;
-    for (const aid of Object.values(votes)) if (aid in t) t[aid] += 1;
+    for (const a of atts) t[a.id] = 0;
+    for (const aid of Object.values(v)) if (aid in t) t[aid] += 1;
     return t;
-  })();
+  }
+
+  $: tally = countVotes(attempts, votes);
   $: top = Math.max(0, ...Object.values(tally));
   $: leaders = top > 0 ? attempts.filter((a) => tally[a.id] === top) : [];
   $: myVote = meId ? votes[meId] : undefined;

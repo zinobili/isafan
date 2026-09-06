@@ -37,8 +37,6 @@ class Settings:
     audio_sample_rate: int        # canonical WAV sample rate
     max_clip_seconds: int         # reject recordings longer than this
     max_upload_bytes: int         # reject uploads larger than this
-    admin_user: str               # Phase 6
-    admin_password_hash: str      # Phase 6
 
 
 def _int(name: str, default: int) -> int:
@@ -84,8 +82,6 @@ def load_settings() -> Settings:
         audio_sample_rate=_int("ISAFAN_AUDIO_SR", 16_000),
         max_clip_seconds=_int("ISAFAN_MAX_CLIP_SECONDS", 45),
         max_upload_bytes=_int("ISAFAN_MAX_UPLOAD_BYTES", 25 * 1024 * 1024),
-        admin_user=os.environ.get("ISAFAN_ADMIN_USER", "admin"),
-        admin_password_hash=os.environ.get("ISAFAN_ADMIN_PASSWORD_HASH", ""),
     )
 
 
