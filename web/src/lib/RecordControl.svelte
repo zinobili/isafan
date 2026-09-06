@@ -107,10 +107,16 @@
     <p>{hint}</p>
     <button on:click={begin} disabled={busy}>Start recording</button>
   {:else}
-    <p>This page can't record in the browser (needs HTTPS), so use your phone's recorder.</p>
+    <p>In-page recording needs HTTPS. Tap below to record with your phone.</p>
     <label class="filepick" class:disabled={busy}>
-      <input type="file" accept="audio/*" on:change={onFile} disabled={busy} />
-      🎙 Record / choose audio
+      <input
+        type="file"
+        accept="audio/*"
+        capture="user"
+        on:change={onFile}
+        disabled={busy}
+      />
+      🎤 Record audio
     </label>
   {/if}
 {:else if ui === "warming"}
