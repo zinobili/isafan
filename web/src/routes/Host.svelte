@@ -3,16 +3,19 @@
   import QRCode from "qrcode";
   import { connect, createGame, leaveGame, game, me, lastError, connState } from "../lib/socket";
   import { navigate } from "../lib/router";
+  import { publicBase } from "../lib/config";
   import Lobby from "../lib/Lobby.svelte";
 
   let name = "Host";
   let qr = "";
+  let base = location.origin;
 
-  onMount(() => {
+  onMount(async () => {
     connect();
+    base = await publicBase();
   });
 
-  $: joinUrl = $game ? `${location.origin}/r/${$game.code}` : "";
+  $: joinUrl = $game ? `${base}/r/${$game.code}` : "";
   $: if (joinUrl) {
     QRCode.toDataURL(joinUrl, { margin: 1, width: 400 })
       .then((d: string) => (qr = d))

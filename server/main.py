@@ -34,6 +34,14 @@ def health() -> dict:
     return {"status": "ok", "version": __version__, "games": len(registry.all())}
 
 
+@app.get("/api/config")
+def client_config() -> dict:
+    """Values the SPA needs at runtime. `publicUrl` is "" unless configured, in
+    which case the host screen builds the join link / QR from it instead of the
+    origin it was opened with."""
+    return {"publicUrl": settings.public_url}
+
+
 @app.get("/api/games/{code}")
 def game_summary(code: str):
     game = registry.get(code)

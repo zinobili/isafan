@@ -59,10 +59,34 @@ npm --prefix web run build            # emits web/dist
 
 Open <http://localhost:8000>.
 
+## Play from a phone (same Wi-Fi)
+
+The join link and its QR code default to whatever address the host screen was
+opened with — so `localhost` produces a QR your phone can't reach. Point it at
+this machine's LAN IP instead:
+
+1. Find the IP: `ipconfig` → the Wi-Fi adapter's IPv4 address (e.g. `192.168.1.20`).
+2. Start the server with that address as the public URL:
+
+   ```bash
+   $env:ISAFAN_PUBLIC_URL = "http://192.168.1.20:8000"
+   .venv\Scripts\python -m server
+   ```
+
+   (or put `ISAFAN_PUBLIC_URL=http://192.168.1.20:8000` in a `.env` file).
+3. Open <http://localhost:8000/host> on this machine — the QR now encodes the LAN
+   address. Scan it from a phone on the same Wi-Fi.
+
+Notes: Windows Firewall may prompt to allow port 8000 (allow it for Private
+networks). A VPN on this machine can block phone↔PC LAN traffic. Microphone
+recording (Phase 2+) needs HTTPS, so a same-Wi-Fi `http://` setup is only good
+for the join/lobby flow — use a tunnel for the full game.
+
 ## Configuration
 
-All optional — see `.env.example`. Environment variables are read at startup
-(`ISAFAN_PORT`, `ISAFAN_MAX_PLAYERS`, `ISAFAN_DATA_DIR`, …).
+All optional — see `.env.example`. Read at startup from the environment or a
+local `.env` file. Notable: `ISAFAN_PUBLIC_URL` (join-link / QR base address),
+`ISAFAN_PORT`, `ISAFAN_MAX_PLAYERS`, `ISAFAN_DATA_DIR`.
 
 ## Layout
 

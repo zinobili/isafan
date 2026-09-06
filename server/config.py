@@ -7,11 +7,21 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+try:  # load a local .env if present; harmless if the package is missing
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:  # pragma: no cover
+    pass
+
 
 @dataclass(frozen=True)
 class Settings:
     host: str
     port: int
+    public_url: str               # e.g. http://192.168.1.20:8000 or a tunnel URL;
+                                  # used to build the join link / QR. "" = use the
+                                  # origin the host screen was opened with.
     data_dir: Path
     storage_backend: str          # "local" now; "s3" added in a later phase
     game_code_length: int
@@ -34,6 +44,7 @@ def load_settings() -> Settings:
     return Settings(
         host=os.environ.get("ISAFAN_HOST", "0.0.0.0"),
         port=_int("ISAFAN_PORT", 8000),
+        public_url=os.environ.get("ISAFAN_PUBLIC_URL", "").strip().rstrip("/"),
         data_dir=Path(os.environ.get("ISAFAN_DATA_DIR", "data")),
         storage_backend=os.environ.get("ISAFAN_STORAGE", "local"),
         game_code_length=_int("ISAFAN_CODE_LENGTH", 4),
