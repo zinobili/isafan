@@ -119,9 +119,10 @@
       🎤 Record audio
     </label>
     <p class="fine">
-      Your phone may open its <strong>video</strong> recorder — that's fine, record a
-      few seconds. Only the audio is used; the video isn't stored, shown, or used
-      for anything.
+      Your phone may open its <strong class="hl">video</strong> recorder — that's
+      fine, record a few seconds.
+      <strong class="safe">Only the audio is used; the video isn't stored, shown,
+      or used for anything.</strong>
     </p>
   {/if}
 {:else if ui === "warming"}
@@ -169,8 +170,15 @@
     pointer-events: none;
   }
   .fine {
-    font-size: 0.72rem;
+    font-size: 0.9rem;
+    line-height: 1.45;
     color: var(--muted);
+  }
+  .fine .hl {
+    color: var(--warn);
+  }
+  .fine .safe {
+    color: var(--ok);
   }
 
   .rec {
