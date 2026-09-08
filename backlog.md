@@ -18,7 +18,10 @@ what's **not** built yet. Rough priority order within each section.
       recordings are kept up to 24 h for a safety check, then deleted.
 - [ ] **Visible recording indicator** while the mic/recorder is live (partly
       there via the REC dot; make it unmissable on the player screen).
-- [ ] **Rate-limit** game + `/api/solo` creation (per-IP token bucket).
+- [x] **Rate-limit** game + `/api/solo` creation (per-IP token bucket) —
+      `server/ratelimit.py`, applied to `POST /api/solo` (429) and the WS
+      `create` verb (`rate_limited` error). `ISAFAN_CREATE_RATE` /
+      `ISAFAN_CREATE_RATE_WINDOW`; in-process only (revisit in Phase 7).
 - [ ] **Wake Lock API** during a round so phones don't sleep mid-record.
 - [ ] **Reconnect phase-resync polish** — on silent rejoin, make sure the
       client lands on the correct phase screen with no stale local state.

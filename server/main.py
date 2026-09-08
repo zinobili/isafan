@@ -8,19 +8,25 @@ import asyncio
 import contextlib
 from collections.abc import AsyncIterator
 
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
 from . import __version__, audio, media, retention
 from .config import settings
 from .game import GameRegistry
+from .ratelimit import RateLimiter
 from .storage import build_storage
 from .ws import Hub
 
 storage = build_storage(settings.storage_backend, settings.data_dir)
 registry = GameRegistry(storage, settings.game_code_length, settings.max_players)
-hub = Hub(registry)
+create_limiter = RateLimiter(settings.create_rate, settings.create_rate_window)
+hub = Hub(registry, create_limiter)
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "?"
 
 
 @contextlib.asynccontextmanager
@@ -107,9 +113,11 @@ def game_summary(code: str):
 
 
 @app.post("/api/solo")
-def create_solo() -> dict:
+def create_solo(request: Request) -> dict:
     """One-device / pass-the-phone game. No WebSocket, no players list — the
     single page drives the flow and talks only to the audio endpoints."""
+    if not create_limiter.allow(_client_ip(request)):
+        raise HTTPException(429, "too many games created — wait a moment and retry")
     game = registry.create(mode="solo")
     return {"code": game.code}
 
