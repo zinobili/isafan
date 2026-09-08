@@ -6,6 +6,7 @@
     recordingFromFile,
     type Recording,
   } from "./audio";
+  import { keepAwake, releaseWake } from "./wakelock";
 
   export let hint = "Tap start, sing, then tap stop.";
   export let useLabel = "Use this take";
@@ -35,6 +36,7 @@
   /** back to the start — requires an explicit tap to record again */
   function toIdle() {
     stopTimer();
+    releaseWake();
     if (takeUrl) URL.revokeObjectURL(takeUrl);
     take = null;
     takeUrl = "";
@@ -56,18 +58,21 @@
   async function begin() {
     err = "";
     ui = "warming";
+    keepAwake(); // hold the screen on for the take; released on stop / redo
     try {
       handle = await startRecording({ onActive });
       // safety net if a browser never emits an early dataavailable
       setTimeout(() => ui === "warming" && onActive(), 1200);
     } catch (e) {
       err = e instanceof Error ? e.message : String(e);
+      releaseWake();
       ui = "idle";
     }
   }
 
   async function stop() {
     stopTimer();
+    releaseWake();
     if (!handle) return;
     take = await handle.stop();
     handle = null;
@@ -97,10 +102,18 @@
 
   onDestroy(() => {
     stopTimer();
+    releaseWake();
     handle?.cancel();
     if (takeUrl) URL.revokeObjectURL(takeUrl);
   });
 </script>
+
+{#if ui === "warming" || ui === "recording"}
+  <div class="rec-banner" role="status" aria-live="polite">
+    <span class="rec-dot" aria-hidden="true"></span>
+    <span>{ui === "warming" ? "Opening the mic…" : "Recording — your mic is live"}</span>
+  </div>
+{/if}
 
 {#if ui === "idle"}
   {#if inline}
@@ -181,6 +194,42 @@
     color: var(--ok);
   }
 
+  .rec-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+    background: var(--danger);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+    box-shadow: 0 2px 14px rgb(0 0 0 / 0.35);
+  }
+  .rec-banner .rec-dot {
+    background: #fff;
+  }
+  @keyframes rec-banner-pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgb(255 255 255 / 0.6);
+    }
+    70% {
+      box-shadow: 0 0 0 12px rgb(255 255 255 / 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgb(255 255 255 / 0);
+    }
+  }
+  .rec-banner .rec-dot {
+    animation: rec-banner-pulse 1.1s ease-out infinite;
+  }
+
   .rec {
     display: flex;
     align-items: center;
@@ -219,7 +268,8 @@
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .rec-dot {
+    .rec-dot,
+    .rec-banner .rec-dot {
       animation: none;
     }
   }
