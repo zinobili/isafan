@@ -91,10 +91,17 @@ def client_config() -> dict:
     """Values the SPA needs at runtime. `publicUrl` is the join-link / QR base
     (explicit ISAFAN_PUBLIC_URL, else an auto-detected LAN address, else "" so
     the client uses its own origin). `publicUrlCandidates` lists every reachable
-    base so the host screen can offer alternates when the first can't be reached."""
+    base so the host screen can offer alternates when the first can't be reached.
+    `retentionHours` is `ISAFAN_GAME_TTL` rounded to whole hours (0 when purging
+    is disabled) — the join-time privacy notice shows it."""
     return {
         "publicUrl": settings.public_url,
         "publicUrlCandidates": list(settings.public_url_candidates),
+        "retentionHours": (
+            round(settings.game_ttl_seconds / 3600)
+            if settings.game_ttl_seconds > 0
+            else 0
+        ),
     }
 
 

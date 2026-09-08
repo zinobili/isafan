@@ -14,8 +14,9 @@ what's **not** built yet. Rough priority order within each section.
       (audio + `game.json`) once it's older than `ISAFAN_GAME_TTL`, via the
       `Storage` interface. Sweeps once on startup, then on the interval. Age
       comes from `game.json`'s `createdAt`, falling back to folder mtime.
-- [ ] **Join-time privacy notice** — one line on the join / solo-intro screen:
-      recordings are kept up to 24 h for a safety check, then deleted.
+- [x] **Join-time privacy notice** — `PrivacyNote.svelte` on the join / solo
+      intro screens; the window ("kept up to N hours") is read from
+      `/api/config`'s `retentionHours`, which tracks `ISAFAN_GAME_TTL`.
 - [x] **Visible recording indicator** while the mic/recorder is live — a fixed
       full-width red "Recording — your mic is live" banner in `RecordControl`
       (warming + hot), on top of the existing inline REC row.

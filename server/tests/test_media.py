@@ -14,6 +14,7 @@ def test_health_and_config(client):
     assert h["status"] == "ok" and h["ffmpeg"] is True
     cfg = client.get("/api/config").json()
     assert cfg["publicUrl"] == "http://testhost:8000"
+    assert cfg["retentionHours"] == 24  # ISAFAN_GAME_TTL default, in whole hours
 
 
 def test_api_miss_is_json_404_not_spa(client):
