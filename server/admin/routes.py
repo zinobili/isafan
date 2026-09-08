@@ -160,13 +160,18 @@ def build_admin_router(registry: GameRegistry, storage: Storage) -> APIRouter:
             f'<td>{r["players"]}</td><td>{r["attempts"]}</td>'
             f'<td>{esc(human_duration(r["age_seconds"]))} ago</td>'
             f'<td>{esc(human_duration(r["expires_in_seconds"]))}</td>'
-            "</tr>"
+            "<td>"
+            + render.post_button(
+                f"/admin/games/{r['code']}/delete", "delete", csrf,
+                danger=True, confirm=f"Delete game {r['code']} and every clip?",
+            )
+            + "</td></tr>"
             for r in rows
         )
         body = (
             f"<h1>Recordings <span class=muted>({len(rows)})</span></h1>"
             "<table><tr><th>Code</th><th>Mode</th><th>Phase</th><th>Players</th>"
-            "<th>Takes</th><th>Age</th><th>Expires in</th></tr>"
+            "<th>Takes</th><th>Age</th><th>Expires in</th><th></th></tr>"
             f"{trs}</table>"
         )
         return render.page("Recordings", body, user=user, csrf=csrf)
@@ -184,8 +189,12 @@ def build_admin_router(registry: GameRegistry, storage: Storage) -> APIRouter:
             if not name:
                 return f'<p class="muted">{esc(label)}: —</p>'
             url = f"/admin/games/{esc(code)}/audio/{esc(name)}"
+            drop = render.post_button(
+                f"/admin/games/{code}/clips/{name}/delete", "delete", csrf,
+                danger=True, confirm=f"Delete {name}?",
+            )
             return (
-                f"<p>{esc(label)} · <span class=muted>{esc(name)}</span></p>"
+                f"<p>{esc(label)} · <span class=muted>{esc(name)}</span> · {drop}</p>"
                 f'<audio controls preload="none" src="{url}"></audio>'
             )
 
@@ -225,11 +234,46 @@ def build_admin_router(registry: GameRegistry, storage: Storage) -> APIRouter:
             items = "".join(clip("Orphan clip", n) for n in detail["orphans"])
             orphan_html = f"<h2>Unlinked clips</h2><div class=card>{items}</div>"
 
+        delete_all = render.post_button(
+            f"/admin/games/{code}/delete", "Delete whole game", csrf,
+            danger=True, confirm=f"Delete game {code} and every clip?",
+        )
         body = (
-            head + orig_html + atts_html + orphan_html
+            head + f'<p style="margin:8px 0 4px">{delete_all}</p>'
+            + orig_html + atts_html + orphan_html
             + '<p style="margin-top:20px"><a href="/admin/games">← all recordings</a></p>'
         )
         return render.page(f"Game {code}", body, user=user, csrf=csrf)
+
+    # --- manual deletes (protected, CSRF-guarded) -------------------
+
+    @router.post("/games/{code}/delete")
+    def delete_game(
+        code: str,
+        request: Request,
+        csrf: str = Form(""),
+        _user: str = Depends(auth.admin_required),
+    ):
+        if not auth.check_csrf(request, csrf):
+            raise HTTPException(403, "bad CSRF token")
+        storage.delete(f"games/{code}")
+        registry.drop(code)
+        return RedirectResponse("/admin/games", status_code=303)
+
+    @router.post("/games/{code}/clips/{name}/delete")
+    def delete_clip(
+        code: str,
+        name: str,
+        request: Request,
+        csrf: str = Form(""),
+        _user: str = Depends(auth.admin_required),
+    ):
+        if not auth.check_csrf(request, csrf):
+            raise HTTPException(403, "bad CSRF token")
+        if not is_allowed_clip_name(name):
+            raise HTTPException(404, "unknown clip")
+        storage.delete(f"games/{code}/{name}")
+        return RedirectResponse(f"/admin/games/{code}", status_code=303)
 
     @router.get("/games/{code}/audio/{name}")
     def game_audio(code: str, name: str, _user: str = Depends(auth.admin_required)):

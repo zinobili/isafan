@@ -7,7 +7,7 @@ attempt is reversed again so the group can judge who landed closest.
 Architecture, options, and the full roadmap live in the plan doc:
 `~/.claude/plans/i-want-to-create-vectorized-parnas.md`.
 
-## Status — Phase 5 (retention & safety hardening)
+## Status — Phase 6a (admin portal)
 
 Done:
 
@@ -34,8 +34,15 @@ Done:
   audited on both upload paths incl. the iOS video-recorder fallback. Frontend:
   a join-time privacy notice, an unmissable "mic is live" banner, a screen Wake
   Lock during a take, and a reconnect resync that clears stale local UI state.
+- **Phase 6a** — server-rendered `/admin` portal (`server/admin/`), off until
+  `ISAFAN_ADMIN_USER` + `ISAFAN_ADMIN_PASSWORD_HASH` are set
+  (`python -m server.admin.hashpw` mints the scrypt hash). Signed-cookie
+  session with per-IP login throttling; a status page (uptime, active games,
+  disk + clip usage, next purge); a recordings browser with inline playback of
+  every stored take; and CSRF-guarded "delete now" for a single clip or a whole
+  game. All storage access goes through the `Storage` interface.
 
-Not yet: admin portal, online hosting (Phases 6–7).
+Not yet: admin song-library manager (Phase 6b), online hosting (Phase 7).
 
 > On a plain-http LAN page the browser blocks in-page recording, so the record
 > control falls back to the phone's own voice recorder via a file input (see
@@ -144,7 +151,8 @@ local `.env` file. Notable: `ISAFAN_PUBLIC_URL` (join-link / QR base address),
 ## Layout
 
 ```
-server/   FastAPI app — config, storage, game model, ws hub, audio, entrypoint
+server/   FastAPI app — config, storage, game model, ws hub, audio, retention
+server/admin/   server-rendered /admin portal (auth, status, recordings, delete)
 server/tests/   pytest suite
 web/      Svelte + Vite SPA — routes/, lib/ (socket client, router, components)
 data/     runtime only (gitignored): per-game folders, game.json + audio clips

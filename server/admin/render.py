@@ -22,6 +22,20 @@ def human_bytes(n: int | None) -> str:
     return f"{x:.1f} TB"
 
 
+def post_button(
+    action: str, label: str, csrf: str, *, danger: bool = False, confirm: str = ""
+) -> str:
+    """An inline single-button form that POSTs `action` with the CSRF token."""
+    cls = "link danger" if danger else "link"
+    onclick = f" onclick=\"return confirm('{esc(confirm)}')\"" if confirm else ""
+    return (
+        f'<form class="inline" method="post" action="{esc(action)}">'
+        f'<input type="hidden" name="csrf" value="{esc(csrf)}">'
+        f'<button class="{cls}" type="submit"{onclick}>{esc(label)}</button>'
+        "</form>"
+    )
+
+
 def human_duration(seconds: float | None) -> str:
     if seconds is None:
         return "—"
@@ -61,6 +75,7 @@ _CSS = """
            background: #4c5bd4; color: #fff; cursor: pointer; }
   button.danger { background: #d33f3f; }
   button.link { background: none; color: #4c5bd4; padding: 0; }
+  button.link.danger { background: none; color: #d33f3f; }
   .muted { color: #6b7080; }
   .err { color: #d33f3f; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }

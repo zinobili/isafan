@@ -46,19 +46,24 @@ what's **not** built yet. Rough priority order within each section.
       per-IP failed-login throttle, `Secure` cookie unless
       `ISAFAN_ADMIN_INSECURE=1`. Portal 404s until it's configured. CSRF-guarded
       logout. Server-rendered HTML, no new deps.
-- [ ] **Status page** — uptime, active games, players per game, `data/` disk
-      usage, count + age of stored clips, next purge time.
-- [ ] **Recordings browser** — list games (id, created, expiry); per game the
-      original + every attempt with inline `<audio>` playback (reversed and
-      forward), for policy review.
-- [ ] **Delete now** — remove a single clip or a whole game before the 24 h
-      auto-purge. All reads/writes go through the `Storage` interface so it
-      keeps working after a move to object storage.
-- [ ] **Song library manager** — this is where the preloaded songs and relay
-      material get prepared (see "Feature ideas"). Add / record / re-upload a
-      reference clip, name it, listen back, enable / disable it, and for relay
-      songs mark the line boundaries. Writes go through `Storage`
-      (`assets/songs/<slug>/…` + a manifest) so the game code just reads them.
+- [x] **Status page** — `/admin`: uptime, active games (phase / round /
+      connected / age), stored game folders, stored-clip count + bytes, `data/`
+      disk usage + volume headroom, next purge time
+      (`retention.last_sweep_at` + interval). `server/admin/status.py`.
+- [x] **Recordings browser** — `/admin/games` (code, mode, phase, players,
+      takes, age, time-to-expiry); `/admin/games/<code>` shows the original
+      (reversed / forward / source) and every attempt as inline `<audio>` plus
+      any unlinked clips, streamed via an auth-gated route. Reads go through
+      `Storage`, so games that have left memory stay reviewable.
+- [x] **Delete now** — CSRF-guarded `POST /admin/games/<code>/delete` (whole
+      game + `registry.drop`) and `.../clips/<name>/delete` (one file), both via
+      the `Storage` interface. Buttons on the browser pages.
+- [ ] **Song library manager** — DEFERRED to a 6b pass (content tooling, not
+      safety). This is where the preloaded songs and relay material get
+      prepared (see "Feature ideas"). Add / record / re-upload a reference
+      clip, name it, listen back, enable / disable it, and for relay songs mark
+      the line boundaries. Writes go through `Storage` (`assets/songs/<slug>/…`
+      + a manifest) so the game code just reads them.
 
 ### Phase 7 — Online hosting
 
