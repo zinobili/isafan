@@ -77,6 +77,48 @@ def test_original_rejects_too_long(client, webm_long):
     assert r.status_code == 400 and "limit" in r.json()["detail"]
 
 
+def test_upload_size_cap_enforced_on_both_paths(client):
+    """conftest caps uploads at 2 MB. Oversized bodies are refused (413) on the
+    original and the attempt endpoints alike — including via the fallback path
+    that names the part like a phone recording."""
+    oversized = b"\x00" * (2_000_000 + 1)
+    g = registry.create("solo")
+    r = client.post(
+        f"/api/games/{g.code}/original",
+        files={"file": ("original.webm", oversized, "audio/webm")},
+        data={"playerId": ""},
+    )
+    assert r.status_code == 413
+
+    g.original = {"durationMs": 1000}
+    g.phase = Phase.AUDIENCE_RECORDING
+    r = client.post(
+        f"/api/games/{g.code}/attempts",
+        files={"file": ("memo.m4a", oversized, "audio/x-m4a")},
+        data={"name": "Ada", "playerId": ""},
+    )
+    assert r.status_code == 413
+
+
+def test_attempt_accepts_video_recorder_upload(client, webm_bytes):
+    """iOS opens the *video* recorder from the file input; the phone posts a
+    .mov / video-mimetype part. ffmpeg keeps the audio stream, caps still apply,
+    and the stored clip is reachable."""
+    g = registry.create("solo")
+    client.post(f"/api/games/{g.code}/original", files=_files(webm_bytes), data={"playerId": ""})
+    g.phase = Phase.AUDIENCE_RECORDING
+
+    r = client.post(
+        f"/api/games/{g.code}/attempts",
+        files={"file": ("clip.mov", webm_bytes, "video/quicktime")},
+        data={"name": "Ida", "playerId": ""},
+    )
+    assert r.status_code == 200
+    eid = r.json()["id"]
+    assert registry.get(g.code).attempts[0]["sourceExt"] == "mov"
+    assert client.get(f"/api/games/{g.code}/audio/attempt_{eid}_source.mov").status_code == 200
+
+
 def test_attempts_multi_phase_gate_and_replace(client, webm_bytes):
     g = registry.create("multi")
     g.add_player("H", as_host=True)

@@ -25,8 +25,11 @@ what's **not** built yet. Rough priority order within each section.
 - [ ] **Wake Lock API** during a round so phones don't sleep mid-record.
 - [ ] **Reconnect phase-resync polish** — on silent rejoin, make sure the
       client lands on the correct phase screen with no stale local state.
-- [ ] Confirm upload size / duration caps + content-type checks are enforced
-      everywhere (caps exist; audit the video-recorder path).
+- [x] Confirm upload size / duration caps + content-type checks are enforced
+      everywhere — both `/original` and `/attempts` run through
+      `_ingest_reversed` (stream cap + early `Content-Length` reject + ffmpeg
+      audio sniff + duration cap). Regression tests cover both paths and the
+      iOS video-recorder (`.mov` / `video/*`) upload.
 
 ### Phase 6 — Admin portal
 

@@ -72,6 +72,11 @@ _ATTEMPT_SOURCE_RE = re.compile(
 
 
 async def _read_capped(file: UploadFile, limit: int) -> bytes:
+    # Reject early when the multipart part declares a size over the limit, so an
+    # oversized upload doesn't get buffered up to `limit` first. The streaming
+    # check below stays the real guard (a client can lie about / omit the size).
+    if file.size is not None and file.size > limit:
+        raise HTTPException(413, f"recording too large (limit {limit} bytes)")
     buf = bytearray()
     while chunk := await file.read(1 << 16):
         buf += chunk
