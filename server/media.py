@@ -12,7 +12,6 @@ playerId. Solo mode (one device, pass-the-phone) skips both checks.
 
 from __future__ import annotations
 
-import re
 import tempfile
 import time
 from pathlib import Path
@@ -22,54 +21,17 @@ from fastapi import APIRouter, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from . import audio
+from .clips import (
+    EXT_BY_MIME,
+    MEDIA_TYPE_BY_EXT,
+    SOURCE_EXTS,
+    is_allowed_clip_name,
+    media_type_for,
+)
 from .config import settings
 from .game import GameRegistry, Phase
 from .storage import Storage
 from .ws import Hub
-
-# The file-input fallback (plain-http LAN pages) uploads whatever the phone's
-# own recorder produces — iOS gives m4a/caf, or a .mov when it opens the video
-# recorder; Android often 3gp/amr. ffmpeg content-sniffs and takes the audio
-# stream regardless; these maps just keep the stored filename sane.
-_EXT_BY_MIME = {
-    "audio/webm": "webm",
-    "video/webm": "webm",
-    "audio/ogg": "ogg",
-    "audio/opus": "ogg",
-    "audio/mp4": "mp4",
-    "video/mp4": "mp4",
-    "video/quicktime": "mov",
-    "audio/x-m4a": "m4a",
-    "audio/m4a": "m4a",
-    "audio/aac": "aac",
-    "audio/mpeg": "mp3",
-    "audio/3gpp": "3gp",
-    "video/3gpp": "3gp",
-    "audio/amr": "amr",
-    "audio/x-caf": "caf",
-    "audio/wav": "wav",
-    "audio/x-wav": "wav",
-    "audio/wave": "wav",
-}
-_MEDIA_TYPE_BY_EXT = {
-    "wav": "audio/wav",
-    "webm": "audio/webm",
-    "ogg": "audio/ogg",
-    "mp4": "audio/mp4",
-    "m4a": "audio/mp4",
-    "mov": "video/quicktime",
-    "aac": "audio/aac",
-    "mp3": "audio/mpeg",
-    "3gp": "audio/3gpp",
-    "amr": "audio/amr",
-    "caf": "audio/x-caf",
-}
-_SOURCE_EXTS = tuple(_MEDIA_TYPE_BY_EXT)
-_ATTEMPT_REVERSED_RE = re.compile(r"^attempt_[A-Za-z0-9_-]{1,16}_reversed\.wav$")
-_ATTEMPT_SOURCE_RE = re.compile(
-    r"^attempt_[A-Za-z0-9_-]{1,16}_source\.(" + "|".join(_SOURCE_EXTS) + r")$"
-)
-
 
 async def _read_capped(file: UploadFile, limit: int) -> bytes:
     # Reject early when the multipart part declares a size over the limit, so an
@@ -87,11 +49,11 @@ async def _read_capped(file: UploadFile, limit: int) -> bytes:
 
 def _ext_for(file: UploadFile) -> str:
     if file.content_type:
-        base = _EXT_BY_MIME.get(file.content_type.split(";")[0].strip().lower())
+        base = EXT_BY_MIME.get(file.content_type.split(";")[0].strip().lower())
         if base:
             return base
     suffix = Path(file.filename or "").suffix.lstrip(".").lower()
-    return suffix if suffix in _MEDIA_TYPE_BY_EXT else "bin"
+    return suffix if suffix in MEDIA_TYPE_BY_EXT else "bin"
 
 
 async def _ingest_reversed(
@@ -223,22 +185,14 @@ def build_router(registry: GameRegistry, storage: Storage, hub: Hub) -> APIRoute
 
     @router.get("/audio/{name}")
     def get_audio(code: str, name: str):
-        if name in ("original_reversed.wav", "original_forward.wav") or (
-            name.startswith("original_source.") and name.split(".")[-1] in _SOURCE_EXTS
-        ):
-            key = f"games/{code}/{name}"
-        elif _ATTEMPT_REVERSED_RE.match(name) or _ATTEMPT_SOURCE_RE.match(name):
-            key = f"games/{code}/{name}"
-        else:
+        if not is_allowed_clip_name(name):
             raise HTTPException(404, "unknown clip")
-
-        path = storage.local_path(key)
+        path = storage.local_path(f"games/{code}/{name}")
         if path is None or not path.is_file():
             raise HTTPException(404, "clip not found")
-        ext = name.rsplit(".", 1)[-1]
         return FileResponse(
             path,
-            media_type=_MEDIA_TYPE_BY_EXT.get(ext, "application/octet-stream"),
+            media_type=media_type_for(name),
             headers={"Cache-Control": "no-store"},
         )
 
