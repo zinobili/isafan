@@ -9,9 +9,11 @@ what's **not** built yet. Rough priority order within each section.
 
 ### Phase 5 — Retention & safety hardening
 
-- [ ] **24 h auto-purge task** — a scheduler that deletes each game's folder
+- [x] **24 h auto-purge task** — `server/retention.py`: a background loop
+      (`ISAFAN_PURGE_INTERVAL`, default 1 h) that deletes each game's folder
       (audio + `game.json`) once it's older than `ISAFAN_GAME_TTL`, via the
-      `Storage` interface. Runs on an interval; also sweep on startup.
+      `Storage` interface. Sweeps once on startup, then on the interval. Age
+      comes from `game.json`'s `createdAt`, falling back to folder mtime.
 - [ ] **Join-time privacy notice** — one line on the join / solo-intro screen:
       recordings are kept up to 24 h for a safety check, then deleted.
 - [ ] **Visible recording indicator** while the mic/recorder is live (partly

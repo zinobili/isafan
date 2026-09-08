@@ -33,6 +33,7 @@ class Settings:
     static_dir: Path              # built SPA; served only if this dir exists
     dev_cors_origin: str          # Vite dev server origin, for local development
     game_ttl_seconds: int         # retention window for stored audio / metadata
+    purge_interval_seconds: int   # how often the retention sweep runs (0 = off)
     ffmpeg_path: str              # override; "" = bundled (imageio-ffmpeg) or PATH
     audio_sample_rate: int        # canonical WAV sample rate
     max_clip_seconds: int         # reject recordings longer than this
@@ -80,6 +81,7 @@ def load_settings() -> Settings:
         static_dir=Path(os.environ.get("ISAFAN_STATIC_DIR", "web/dist")),
         dev_cors_origin=os.environ.get("ISAFAN_DEV_CORS_ORIGIN", "http://localhost:5173"),
         game_ttl_seconds=_int("ISAFAN_GAME_TTL", 24 * 60 * 60),
+        purge_interval_seconds=_int("ISAFAN_PURGE_INTERVAL", 60 * 60),
         ffmpeg_path=os.environ.get("ISAFAN_FFMPEG", "").strip(),
         audio_sample_rate=_int("ISAFAN_AUDIO_SR", 16_000),
         max_clip_seconds=_int("ISAFAN_MAX_CLIP_SECONDS", 45),

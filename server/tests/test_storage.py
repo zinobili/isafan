@@ -33,6 +33,15 @@ def test_delete_file_and_dir(store, tmp_path):
     store.delete("games/ABCD")               # already gone -> no error
 
 
+def test_list_children(store):
+    assert store.list_children("games") == []          # nothing yet
+    store.put_bytes("games/ABCD/original_reversed.wav", b"x")
+    store.put_bytes("games/WXYZ/game.json", b"{}")
+    store.put_text("games/ABCD/game.json", "{}")
+    assert store.list_children("games") == ["ABCD", "WXYZ"]
+    assert set(store.list_children("games/ABCD")) == {"original_reversed.wav", "game.json"}
+
+
 def test_local_path_is_under_root(store, tmp_path):
     p = store.local_path("games/ABCD/x.wav")
     assert p is not None and tmp_path.resolve() in p.parents

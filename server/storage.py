@@ -25,6 +25,12 @@ class Storage(ABC):
         """Remove `key`. A no-op if it doesn't exist."""
 
     @abstractmethod
+    def list_children(self, prefix: str) -> list[str]:
+        """Immediate child names under `prefix` — one level of ``ls``, not a deep
+        walk. Empty when the prefix holds nothing. Used by retention to
+        enumerate stored games (``list_children("games")`` -> room codes)."""
+
+    @abstractmethod
     def local_path(self, key: str) -> Path | None:
         """A real filesystem path for `key` if the backend has one (lets the API
         stream a file directly). `None` for backends without local files."""
@@ -65,6 +71,12 @@ class LocalDiskStorage(Storage):
             shutil.rmtree(p, ignore_errors=True)
         else:
             p.unlink(missing_ok=True)
+
+    def list_children(self, prefix: str) -> list[str]:
+        p = self._resolve(prefix)
+        if not p.is_dir():
+            return []
+        return sorted(entry.name for entry in p.iterdir())
 
     def local_path(self, key: str) -> Path | None:
         return self._resolve(key)

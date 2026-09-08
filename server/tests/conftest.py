@@ -9,6 +9,9 @@ _TMP_DATA = tempfile.mkdtemp(prefix="isafan-test-")
 os.environ["ISAFAN_DATA_DIR"] = _TMP_DATA
 os.environ["ISAFAN_PUBLIC_URL"] = "http://testhost:8000"
 os.environ["ISAFAN_MAX_CLIP_SECONDS"] = "5"
+os.environ["ISAFAN_MAX_UPLOAD_BYTES"] = "2000000"
+os.environ["ISAFAN_PURGE_INTERVAL"] = "0"  # no background retention loop under test
+os.environ["ISAFAN_CREATE_RATE"] = "0"     # rate-limit disabled; tested in isolation
 
 import pytest  # noqa: E402
 from starlette.testclient import TestClient  # noqa: E402

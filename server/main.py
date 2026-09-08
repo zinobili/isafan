@@ -4,11 +4,15 @@ like /host survive a hard refresh."""
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+from collections.abc import AsyncIterator
+
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
-from . import __version__, audio, media
+from . import __version__, audio, media, retention
 from .config import settings
 from .game import GameRegistry
 from .storage import build_storage
@@ -18,7 +22,30 @@ storage = build_storage(settings.storage_backend, settings.data_dir)
 registry = GameRegistry(storage, settings.game_code_length, settings.max_players)
 hub = Hub(registry)
 
-app = FastAPI(title="isafan", version=__version__)
+
+@contextlib.asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Run the retention sweep on a background interval while the app is up."""
+    task: asyncio.Task | None = None
+    if settings.game_ttl_seconds > 0 and settings.purge_interval_seconds > 0:
+        task = asyncio.create_task(
+            retention.retention_loop(
+                registry,
+                storage,
+                settings.game_ttl_seconds,
+                settings.purge_interval_seconds,
+            )
+        )
+    try:
+        yield
+    finally:
+        if task:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+
+app = FastAPI(title="isafan", version=__version__, lifespan=lifespan)
 
 if settings.public_url:
     _extra = settings.public_url_candidates[1:]
