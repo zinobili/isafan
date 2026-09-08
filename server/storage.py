@@ -31,6 +31,10 @@ class Storage(ABC):
         enumerate stored games (``list_children("games")`` -> room codes)."""
 
     @abstractmethod
+    def size(self, key: str) -> int | None:
+        """Size in bytes of the object at `key`, or None if it doesn't exist."""
+
+    @abstractmethod
     def local_path(self, key: str) -> Path | None:
         """A real filesystem path for `key` if the backend has one (lets the API
         stream a file directly). `None` for backends without local files."""
@@ -77,6 +81,13 @@ class LocalDiskStorage(Storage):
         if not p.is_dir():
             return []
         return sorted(entry.name for entry in p.iterdir())
+
+    def size(self, key: str) -> int | None:
+        p = self._resolve(key)
+        try:
+            return p.stat().st_size if p.is_file() else None
+        except OSError:
+            return None
 
     def local_path(self, key: str) -> Path | None:
         return self._resolve(key)

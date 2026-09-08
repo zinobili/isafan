@@ -18,6 +18,10 @@ from .storage import Storage
 
 _GAMES_PREFIX = "games"
 
+# Wall-clock time the retention loop last finished a sweep; None until the first
+# one runs. The admin status page reads this to show "next purge".
+last_sweep_at: float | None = None
+
 
 def _game_age_seconds(storage: Storage, code: str, now: float) -> float | None:
     """Best-effort age of a stored game. Prefers `createdAt` from game.json;
@@ -65,11 +69,13 @@ async def retention_loop(
 ) -> None:
     """Sweep once now, then every `interval_seconds` until cancelled. A failed
     sweep is logged and the loop continues."""
+    global last_sweep_at
     while True:
         try:
             purged = await asyncio.to_thread(
                 purge_expired, registry, storage, ttl_seconds
             )
+            last_sweep_at = time.time()
             if purged:
                 print(
                     f"[isafan] retention: purged {len(purged)} expired game(s): "

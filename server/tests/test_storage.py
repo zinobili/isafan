@@ -42,6 +42,13 @@ def test_list_children(store):
     assert set(store.list_children("games/ABCD")) == {"original_reversed.wav", "game.json"}
 
 
+def test_size(store):
+    assert store.size("games/ABCD/x.wav") is None       # missing
+    store.put_bytes("games/ABCD/x.wav", b"\x00" * 321)
+    assert store.size("games/ABCD/x.wav") == 321
+    assert store.size("games/ABCD") is None             # a dir, not a file
+
+
 def test_local_path_is_under_root(store, tmp_path):
     p = store.local_path("games/ABCD/x.wav")
     assert p is not None and tmp_path.resolve() in p.parents

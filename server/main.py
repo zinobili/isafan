@@ -136,7 +136,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
 
 app.include_router(media.build_router(registry, storage, hub))
-app.include_router(build_admin_router())
+app.include_router(build_admin_router(registry, storage))
 
 
 @app.api_route("/api/{_rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])

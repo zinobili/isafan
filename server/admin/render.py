@@ -10,6 +10,33 @@ from fastapi.responses import HTMLResponse
 
 esc = _esc
 
+
+def human_bytes(n: int | None) -> str:
+    if n is None:
+        return "—"
+    x = float(n)
+    for unit in ("B", "KB", "MB", "GB"):
+        if x < 1024:
+            return f"{x:.0f} {unit}" if unit == "B" else f"{x:.1f} {unit}"
+        x /= 1024
+    return f"{x:.1f} TB"
+
+
+def human_duration(seconds: float | None) -> str:
+    if seconds is None:
+        return "—"
+    s = int(max(0, seconds))
+    d, s = divmod(s, 86400)
+    h, s = divmod(s, 3600)
+    m, s = divmod(s, 60)
+    if d:
+        return f"{d}d {h}h"
+    if h:
+        return f"{h}h {m}m"
+    if m:
+        return f"{m}m {s}s"
+    return f"{s}s"
+
 _CSS = """
   :root { color-scheme: light dark; }
   * { box-sizing: border-box; }
