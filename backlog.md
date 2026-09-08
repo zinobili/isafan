@@ -40,8 +40,12 @@ what's **not** built yet. Rough priority order within each section.
 
 ### Phase 6 — Admin portal
 
-- [ ] `/admin` login — username + password from config (hashed, e.g. argon2),
-      signed session cookie, failed-login throttling, HTTPS-only.
+- [x] `/admin` login — `server/admin/`: username + scrypt password hash from
+      config (`python -m server.admin.hashpw`), HMAC-signed session cookie
+      (key derived from the hash, so a password change ends all sessions),
+      per-IP failed-login throttle, `Secure` cookie unless
+      `ISAFAN_ADMIN_INSECURE=1`. Portal 404s until it's configured. CSRF-guarded
+      logout. Server-rendered HTML, no new deps.
 - [ ] **Status page** — uptime, active games, players per game, `data/` disk
       usage, count + age of stored clips, next purge time.
 - [ ] **Recordings browser** — list games (id, created, expiry); per game the

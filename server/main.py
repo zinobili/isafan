@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
 from . import __version__, audio, media, retention
+from .admin.routes import build_admin_router
 from .config import settings
 from .game import GameRegistry
 from .ratelimit import RateLimiter
@@ -135,6 +136,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
 
 app.include_router(media.build_router(registry, storage, hub))
+app.include_router(build_admin_router())
 
 
 @app.api_route("/api/{_rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])

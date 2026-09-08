@@ -13,11 +13,31 @@ os.environ["ISAFAN_MAX_UPLOAD_BYTES"] = "2000000"
 os.environ["ISAFAN_PURGE_INTERVAL"] = "0"  # no background retention loop under test
 os.environ["ISAFAN_CREATE_RATE"] = "0"     # rate-limit disabled; tested in isolation
 
+from server.admin.passwords import hash_password  # noqa: E402  (stdlib only, no config load)
+
+ADMIN_USER = "root"
+ADMIN_PASSWORD = "s3cret-test-pw"
+os.environ["ISAFAN_ADMIN_USER"] = ADMIN_USER
+os.environ["ISAFAN_ADMIN_PASSWORD_HASH"] = hash_password(ADMIN_PASSWORD)
+os.environ["ISAFAN_ADMIN_INSECURE"] = "1"  # TestClient speaks http; allow the cookie
+
 import pytest  # noqa: E402
 from starlette.testclient import TestClient  # noqa: E402
 
 from server import audio  # noqa: E402
+from server.admin import auth as admin_auth  # noqa: E402
 from server.main import app, hub, registry  # noqa: E402
+
+
+@pytest.fixture
+def admin_creds() -> dict:
+    return {"username": ADMIN_USER, "password": ADMIN_PASSWORD}
+
+
+@pytest.fixture(autouse=True)
+def _reset_admin_login_limiter():
+    admin_auth.login_limiter._buckets.clear()
+    yield
 
 
 @pytest.fixture(autouse=True)

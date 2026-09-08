@@ -42,6 +42,13 @@ class Settings:
     max_upload_bytes: int         # reject uploads larger than this
     ssl_certfile: str             # set both to serve HTTPS (e.g. an mkcert pair)
     ssl_keyfile: str              # so phones on the LAN can record in-page
+    admin_user: str               # /admin login; "" (with no hash) disables the portal
+    admin_password_hash: str      # scrypt hash from `python -m server.admin.hashpw`
+    admin_secret: str             # cookie-signing key; "" derives one from the hash
+    admin_insecure: bool          # allow the admin cookie over plain http (dev only)
+    admin_login_rate: int         # failed-login attempts allowed per IP before 429
+    admin_login_window: int       # seconds for that attempt budget to refill
+    admin_session_ttl: int        # admin session lifetime, seconds
 
 
 def _int(name: str, default: int) -> int:
@@ -49,6 +56,13 @@ def _int(name: str, default: int) -> int:
         return int(os.environ.get(name, "").strip() or default)
     except ValueError:
         return default
+
+
+def _bool(name: str, default: bool) -> bool:
+    v = os.environ.get(name, "").strip().lower()
+    if not v:
+        return default
+    return v in ("1", "true", "yes", "on")
 
 
 def _resolve_public_url(port: int) -> tuple[str, tuple[str, ...], str]:
@@ -92,6 +106,13 @@ def load_settings() -> Settings:
         max_upload_bytes=_int("ISAFAN_MAX_UPLOAD_BYTES", 25 * 1024 * 1024),
         ssl_certfile=os.environ.get("ISAFAN_SSL_CERT", "").strip(),
         ssl_keyfile=os.environ.get("ISAFAN_SSL_KEY", "").strip(),
+        admin_user=os.environ.get("ISAFAN_ADMIN_USER", "").strip(),
+        admin_password_hash=os.environ.get("ISAFAN_ADMIN_PASSWORD_HASH", "").strip(),
+        admin_secret=os.environ.get("ISAFAN_ADMIN_SECRET", "").strip(),
+        admin_insecure=_bool("ISAFAN_ADMIN_INSECURE", False),
+        admin_login_rate=_int("ISAFAN_ADMIN_LOGIN_RATE", 5),
+        admin_login_window=_int("ISAFAN_ADMIN_LOGIN_WINDOW", 15 * 60),
+        admin_session_ttl=_int("ISAFAN_ADMIN_SESSION_TTL", 12 * 60 * 60),
     )
 
 
