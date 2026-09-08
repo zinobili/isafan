@@ -3,6 +3,7 @@
   import { createSolo, uploadOriginal, uploadAttempt } from "../lib/api";
   import RecordControl from "../lib/RecordControl.svelte";
   import PlayClip from "../lib/PlayClip.svelte";
+  import PrivacyNote from "../lib/PrivacyNote.svelte";
   import type { Recording } from "../lib/audio";
 
   type Step = "intro" | "original" | "listen" | "attempts" | "reveal";
@@ -116,6 +117,8 @@
       </div>
       <button class="secondary" on:click={addName}>+ Add player</button>
       <button on:click={start} disabled={!canStart}>Start</button>
+
+      <PrivacyNote />
     </div>
   {:else if step === "original"}
     <div class="panel">

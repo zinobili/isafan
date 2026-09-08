@@ -15,6 +15,7 @@
   import type { Recording } from "../lib/audio";
   import Lobby from "../lib/Lobby.svelte";
   import PlayClip from "../lib/PlayClip.svelte";
+  import PrivacyNote from "../lib/PrivacyNote.svelte";
   import RecordControl from "../lib/RecordControl.svelte";
   import RevealPanel from "../lib/RevealPanel.svelte";
 
@@ -146,6 +147,8 @@
       <button on:click={submit} disabled={!name.trim() || code.trim().length < 3}>
         Join
       </button>
+
+      <PrivacyNote />
     </div>
 
     <div class="row">
