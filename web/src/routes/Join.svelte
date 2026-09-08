@@ -9,6 +9,7 @@
     me,
     lastError,
     connState,
+    resyncNonce,
   } from "../lib/socket";
   import { navigate, path, codeFromPath } from "../lib/router";
   import { uploadAttempt } from "../lib/api";
@@ -42,6 +43,16 @@
   $: myName = $game?.players.find((p) => p.id === $me?.id)?.name ?? "";
   $: iSubmitted = !!($game && $me && $game.attempts.some((a) => a.by === $me.id));
   $: if ($game && $game.phase !== "AUDIENCE_RECORDING") redoing = false;
+
+  // After a silent reconnect, drop any half-finished local recording state and
+  // let the screen re-derive from the fresh game snapshot.
+  let seenNonce = 0;
+  $: if ($resyncNonce !== seenNonce) {
+    seenNonce = $resyncNonce;
+    busy = false;
+    recErr = "";
+    redoing = false;
+  }
 
   async function onSubmit(e: CustomEvent<{ recording: Recording }>) {
     if (!$game || !$me) return;
@@ -91,7 +102,7 @@
           {#if $game.original}
             <PlayClip url={$game.original.url} label="The reversed clip" />
           {/if}
-          {#key redoing}
+          {#key `${redoing}:${$resyncNonce}`}
             <RecordControl {busy} useLabel="Submit my take" on:done={onSubmit} />
           {/key}
           {#if recErr}<span class="err">{recErr}</span>{/if}

@@ -15,6 +15,7 @@
     me,
     lastError,
     connState,
+    resyncNonce,
   } from "../lib/socket";
   import { navigate } from "../lib/router";
   import { publicConfig } from "../lib/config";
@@ -34,6 +35,14 @@
   // HOST_RECORDING upload state
   let busy = false;
   let err = "";
+
+  // Clear transient upload state after a silent reconnect resync.
+  let seenNonce = 0;
+  $: if ($resyncNonce !== seenNonce) {
+    seenNonce = $resyncNonce;
+    busy = false;
+    err = "";
+  }
 
   onMount(async () => {
     connect();
@@ -121,7 +130,9 @@
       <div class="panel">
         <h2>Record the song</h2>
         <p>Sing a line or two, listen back, then send it.</p>
-        <RecordControl {busy} useLabel="Use this take" on:done={onSongTake} />
+        {#key $resyncNonce}
+          <RecordControl {busy} useLabel="Use this take" on:done={onSongTake} />
+        {/key}
         {#if err}<span class="err">{err}</span>{/if}
       </div>
     {:else if $game.phase === "REVERSED_PLAYBACK"}

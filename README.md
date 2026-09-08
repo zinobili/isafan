@@ -7,7 +7,7 @@ attempt is reversed again so the group can judge who landed closest.
 Architecture, options, and the full roadmap live in the plan doc:
 `~/.claude/plans/i-want-to-create-vectorized-parnas.md`.
 
-## Status — Phase 4 (multi-device audience loop)
+## Status — Phase 5 (retention & safety hardening)
 
 Done:
 
@@ -26,8 +26,16 @@ Done:
   and cast `vote` messages (one each, not their own take). Host screen shows a
   submission checklist then a live vote tally; player screens show a recorder
   then a vote list. Late joins are blocked once the round starts.
+- **Phase 5** — retention & safety hardening. A background sweep
+  (`server/retention.py`, `ISAFAN_PURGE_INTERVAL`) deletes each game's stored
+  folder once it's older than `ISAFAN_GAME_TTL`, on startup and on the
+  interval. Per-IP token-bucket rate limit on game creation
+  (`ISAFAN_CREATE_RATE` / `_WINDOW`). Upload size/duration/content-type caps
+  audited on both upload paths incl. the iOS video-recorder fallback. Frontend:
+  a join-time privacy notice, an unmissable "mic is live" banner, a screen Wake
+  Lock during a take, and a reconnect resync that clears stale local UI state.
 
-Not yet: retention task, admin portal (Phases 5–7).
+Not yet: admin portal, online hosting (Phases 6–7).
 
 > On a plain-http LAN page the browser blocks in-page recording, so the record
 > control falls back to the phone's own voice recorder via a file input (see

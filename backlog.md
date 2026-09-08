@@ -16,15 +16,21 @@ what's **not** built yet. Rough priority order within each section.
       comes from `game.json`'s `createdAt`, falling back to folder mtime.
 - [ ] **Join-time privacy notice** — one line on the join / solo-intro screen:
       recordings are kept up to 24 h for a safety check, then deleted.
-- [ ] **Visible recording indicator** while the mic/recorder is live (partly
-      there via the REC dot; make it unmissable on the player screen).
+- [x] **Visible recording indicator** while the mic/recorder is live — a fixed
+      full-width red "Recording — your mic is live" banner in `RecordControl`
+      (warming + hot), on top of the existing inline REC row.
 - [x] **Rate-limit** game + `/api/solo` creation (per-IP token bucket) —
       `server/ratelimit.py`, applied to `POST /api/solo` (429) and the WS
       `create` verb (`rate_limited` error). `ISAFAN_CREATE_RATE` /
       `ISAFAN_CREATE_RATE_WINDOW`; in-process only (revisit in Phase 7).
-- [ ] **Wake Lock API** during a round so phones don't sleep mid-record.
-- [ ] **Reconnect phase-resync polish** — on silent rejoin, make sure the
-      client lands on the correct phase screen with no stale local state.
+- [x] **Wake Lock API** during a round so phones don't sleep mid-record —
+      `web/src/lib/wakelock.ts`, held for the duration of a take in
+      `RecordControl`, re-acquired on `visibilitychange`. No-op where
+      unsupported.
+- [x] **Reconnect phase-resync polish** — `socket.ts` exposes a `resyncNonce`
+      bumped when a silent `rejoin` completes; Host/Join key the recorder and
+      clear transient upload/error state on it, so the screen re-derives purely
+      from the fresh `game` snapshot.
 - [x] Confirm upload size / duration caps + content-type checks are enforced
       everywhere — both `/original` and `/attempts` run through
       `_ingest_reversed` (stream cap + early `Content-Length` reject + ffmpeg

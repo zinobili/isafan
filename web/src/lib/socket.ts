@@ -36,6 +36,10 @@ export const connState = writable<ConnState>("idle");
 export const game = writable<GameView | null>(null);
 export const me = writable<{ id: string; code: string } | null>(null);
 export const lastError = writable<string | null>(null);
+/** Bumped each time a silent reconnect completes a `rejoin`. Screens key
+ *  volatile local UI (a half-finished recorder, a stale inline error) on this
+ *  so a resync drops it and re-derives purely from the fresh `game` state. */
+export const resyncNonce = writable(0);
 
 const LS_KEY = "isafan.session";
 
@@ -45,6 +49,7 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let keepAlive: ReturnType<typeof setInterval> | null = null;
 let backoff = 500;
 let closedByUs = false;
+let awaitingRejoin = false;
 let session: { code: string; playerId: string } | null = loadSession();
 
 function loadSession(): { code: string; playerId: string } | null {
@@ -100,6 +105,7 @@ export function connect(): void {
     backoff = 500;
     connState.set("open");
     if (session) {
+      awaitingRejoin = true;
       send({ type: "rejoin", code: session.code, playerId: session.playerId });
     }
     for (const m of outbox.splice(0)) send(m);
@@ -138,6 +144,10 @@ function handle(msg: any): void {
       game.set(msg.game);
       lastError.set(null);
       saveSession({ code: msg.code, playerId: msg.playerId });
+      if (awaitingRejoin) {
+        awaitingRejoin = false;
+        resyncNonce.update((n) => n + 1);
+      }
       break;
     case "game":
       game.set(msg.game);
@@ -145,6 +155,7 @@ function handle(msg: any): void {
     case "error":
       lastError.set(msg.message ?? msg.code ?? "unknown error");
       if (msg.code === "game_not_found") {
+        awaitingRejoin = false;
         saveSession(null);
         game.set(null);
         me.set(null);
