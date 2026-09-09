@@ -122,6 +122,13 @@ def game_summary(code: str):
     }
 
 
+@app.get("/api/songs")
+def list_songs() -> list[dict]:
+    """Enabled library songs a host / solo player can pick instead of recording
+    the original. Public — this is reference material meant to be played."""
+    return song_library.enabled_public()
+
+
 @app.post("/api/solo")
 def create_solo(request: Request) -> dict:
     """One-device / pass-the-phone game. No WebSocket, no players list — the
@@ -137,7 +144,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
     await hub.handle(ws)
 
 
-app.include_router(media.build_router(registry, storage, hub))
+app.include_router(media.build_router(registry, storage, hub, song_library))
 app.include_router(build_admin_router(registry, storage, song_library))
 
 

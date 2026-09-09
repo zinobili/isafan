@@ -1,12 +1,14 @@
 """Audio upload + download.
 
-POST /api/games/{code}/original    the sung take; reversed + transcoded, moves
-                                   the game to REVERSED_PLAYBACK.
-POST /api/games/{code}/attempts    one player's mimic; reversed + transcoded,
-                                   appended to the game's attempts.
-GET  /api/games/{code}/audio/{name}   serve a stored clip (allow-listed names).
+POST /api/games/{code}/original         the sung take; reversed + transcoded,
+                                        moves the game to REVERSED_PLAYBACK.
+POST /api/games/{code}/original/library pick a library song as the original
+                                        instead of recording one.
+POST /api/games/{code}/attempts         one player's mimic; reversed +
+                                        transcoded, appended to the attempts.
+GET  /api/games/{code}/audio/{name}     serve a stored clip (allow-listed names).
 
-In multi-device mode `/original` is host-only and `/attempts` requires a known
+In multi-device mode `/original*` is host-only and `/attempts` requires a known
 playerId. Solo mode (one device, pass-the-phone) skips both checks.
 """
 
@@ -20,11 +22,14 @@ from fastapi.responses import FileResponse
 from .clips import is_allowed_clip_name, media_type_for
 from .game import GameRegistry, Phase
 from .ingest import ingest_reversed
+from .songs import SongLibrary
 from .storage import Storage
 from .ws import Hub
 
 
-def build_router(registry: GameRegistry, storage: Storage, hub: Hub) -> APIRouter:
+def build_router(
+    registry: GameRegistry, storage: Storage, hub: Hub, songs: SongLibrary
+) -> APIRouter:
     router = APIRouter(prefix="/api/games/{code}")
 
     @router.post("/original")
@@ -45,6 +50,32 @@ def build_router(registry: GameRegistry, storage: Storage, hub: Hub) -> APIRoute
             "durationMs": round(duration * 1000),
             "sourceExt": ext,
             "uploadedBy": playerId,
+            "at": time.time(),
+        }
+        game.phase = Phase.REVERSED_PLAYBACK
+        registry.persist(game)
+        await hub.broadcast(code)
+        return {"ok": True, **game.original_public()}
+
+    @router.post("/original/library")
+    async def pick_original_from_library(
+        code: str, slug: str = Form(...), playerId: str = Form("")
+    ):
+        game = registry.get(code)
+        if not game:
+            raise HTTPException(404, "no game with that code")
+        if game.mode != "solo" and playerId != game.host_id:
+            raise HTTPException(403, "only the host picks the song")
+
+        song = songs.copy_original_into(slug, f"games/{code}/original")
+        if song is None:
+            raise HTTPException(404, "no such song in the library")
+
+        game.original = {
+            "durationMs": song.get("durationMs", 0),
+            "sourceExt": song.get("sourceExt", "bin"),
+            "uploadedBy": f"library:{slug}",
+            "songSlug": slug,
             "at": time.time(),
         }
         game.phase = Phase.REVERSED_PLAYBACK

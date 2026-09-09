@@ -16,10 +16,36 @@ async function post(url: string, body: FormData | undefined) {
 
 export type OriginalResult = { durationMs: number; url: string; forwardUrl: string };
 export type AttemptResult = { id: string; name: string; durationMs: number; url: string };
+export type LibrarySong = {
+  slug: string;
+  name: string;
+  durationMs: number;
+  lineCount: number;
+};
 
 /** Create a one-device (pass-the-phone) game. Returns its code. */
 export async function createSolo(): Promise<{ code: string }> {
   return post("/api/solo", undefined);
+}
+
+/** Enabled reference songs a host / solo player can pick instead of recording. */
+export async function listSongs(): Promise<LibrarySong[]> {
+  const res = await fetch("/api/songs");
+  if (!res.ok) throw new Error(`request failed (${res.status})`);
+  return res.json();
+}
+
+/** Use a library song as the game's original (server copies its clips in and
+ * moves the game to REVERSED_PLAYBACK). `playerId` required in multi-device. */
+export async function pickOriginalFromLibrary(
+  code: string,
+  slug: string,
+  playerId = ""
+): Promise<OriginalResult> {
+  const form = new FormData();
+  form.append("slug", slug);
+  form.append("playerId", playerId);
+  return post(`/api/games/${code}/original/library`, form);
 }
 
 /** Upload the sung take. Server reverses + transcodes it and moves the game to

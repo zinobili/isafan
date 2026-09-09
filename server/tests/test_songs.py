@@ -109,6 +109,18 @@ def test_add_rejects_non_audio(lib):
     assert ei.value.status_code == 400
 
 
+def test_copy_original_into(lib, webm_bytes):
+    _add(lib, "Anthem", webm_bytes)
+    store = lib._storage
+    song = lib.copy_original_into("anthem", "games/ABCD/original")
+    assert song["slug"] == "anthem"
+    for name in ("original_reversed.wav", "original_forward.wav", "original_source.webm"):
+        assert store.local_path(f"games/ABCD/{name}").is_file()
+    assert lib.copy_original_into("missing", "games/ABCD/original") is None
+    lib.set_enabled("anthem", False)
+    assert lib.copy_original_into("anthem", "games/ABCD/original") is None
+
+
 def test_clean_lines_is_pure():
     assert clean_lines(None) == []
     assert clean_lines([{"startMs": 10, "endMs": 5}]) == [

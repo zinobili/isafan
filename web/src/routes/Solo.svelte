@@ -1,7 +1,13 @@
 <script lang="ts">
   import { navigate } from "../lib/router";
-  import { createSolo, uploadOriginal, uploadAttempt } from "../lib/api";
+  import {
+    createSolo,
+    uploadOriginal,
+    uploadAttempt,
+    pickOriginalFromLibrary,
+  } from "../lib/api";
   import RecordControl from "../lib/RecordControl.svelte";
+  import SongPicker from "../lib/SongPicker.svelte";
   import PlayClip from "../lib/PlayClip.svelte";
   import PrivacyNote from "../lib/PrivacyNote.svelte";
   import type { Recording } from "../lib/audio";
@@ -55,6 +61,22 @@
     err = "";
     try {
       const r = await uploadOriginal(code, "", e.detail.recording);
+      originalUrl = r.url;
+      originalForwardUrl = r.forwardUrl;
+      step = "listen";
+    } catch (x) {
+      err = x instanceof Error ? x.message : String(x);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function onPickSong(e: CustomEvent<{ slug: string }>) {
+    if (!code) return;
+    busy = true;
+    err = "";
+    try {
+      const r = await pickOriginalFromLibrary(code, e.detail.slug);
       originalUrl = r.url;
       originalForwardUrl = r.forwardUrl;
       step = "listen";
@@ -154,6 +176,7 @@
       <h2>Record the song</h2>
       <p>Sing a line or two. Everyone else will hear it backwards.</p>
       <RecordControl {busy} useLabel="Reverse it" on:done={onOriginal} />
+      <SongPicker {busy} on:pick={onPickSong} />
       {#if err}<span class="err">{err}</span>{/if}
     </div>
   {:else if step === "listen"}

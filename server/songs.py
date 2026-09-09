@@ -77,6 +77,41 @@ class SongLibrary:
     def get(self, slug: str) -> dict | None:
         return next((s for s in self._load() if s.get("slug") == slug), None)
 
+    def enabled_public(self) -> list[dict]:
+        """The enabled songs, trimmed to what a game client needs to pick one."""
+        return [
+            {
+                "slug": s["slug"],
+                "name": s["name"],
+                "durationMs": s.get("durationMs", 0),
+                "lineCount": len(s.get("lines") or []),
+            }
+            for s in self._load()
+            if s.get("enabled")
+        ]
+
+    def copy_original_into(self, slug: str, dest_prefix: str) -> dict | None:
+        """Copy an enabled song's reversed / forward / source clips to
+        ``{dest_prefix}_reversed.wav`` etc. (e.g. dest_prefix
+        ``games/ABCD/original``) so a game can use a library song as its
+        original with nothing downstream changed. Returns the song entry, or
+        None if the slug is unknown or disabled."""
+        song = self.get(slug)
+        if not song or not song.get("enabled"):
+            return None
+        ext = song.get("sourceExt", "bin")
+        for src, dst in (
+            (f"{PREFIX}/{slug}/reversed.wav", f"{dest_prefix}_reversed.wav"),
+            (f"{PREFIX}/{slug}/forward.wav", f"{dest_prefix}_forward.wav"),
+            (f"{PREFIX}/{slug}/source.{ext}", f"{dest_prefix}_source.{ext}"),
+        ):
+            try:
+                self._storage.put_bytes(dst, self._storage.get_bytes(src))
+            except Exception:
+                if dst.endswith("_reversed.wav"):
+                    return None  # the reversed clip is mandatory
+        return song
+
     def clip_key(self, slug: str, kind: str) -> str | None:
         """Storage key for a song's `reversed` / `forward` / `source` clip, or
         None if the song or kind is unknown."""

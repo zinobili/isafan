@@ -19,11 +19,12 @@
   } from "../lib/socket";
   import { navigate } from "../lib/router";
   import { publicConfig } from "../lib/config";
-  import { uploadOriginal } from "../lib/api";
+  import { uploadOriginal, pickOriginalFromLibrary } from "../lib/api";
   import type { Recording } from "../lib/audio";
   import Lobby from "../lib/Lobby.svelte";
   import PlayClip from "../lib/PlayClip.svelte";
   import RecordControl from "../lib/RecordControl.svelte";
+  import SongPicker from "../lib/SongPicker.svelte";
   import RevealPanel from "../lib/RevealPanel.svelte";
 
   let name = "Host";
@@ -66,6 +67,20 @@
     err = "";
     try {
       await uploadOriginal($game.code, $me.id, e.detail.recording);
+      // server broadcasts phase REVERSED_PLAYBACK
+    } catch (x) {
+      err = x instanceof Error ? x.message : String(x);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function onPickSong(e: CustomEvent<{ slug: string }>) {
+    if (!$game || !$me) return;
+    busy = true;
+    err = "";
+    try {
+      await pickOriginalFromLibrary($game.code, e.detail.slug, $me.id);
       // server broadcasts phase REVERSED_PLAYBACK
     } catch (x) {
       err = x instanceof Error ? x.message : String(x);
@@ -125,6 +140,8 @@
         <h2>The song</h2>
         <p>One person sings a line or two. Everyone else will hear it backwards.</p>
         <button on:click={startSongRecording}>Record the song</button>
+        <SongPicker {busy} on:pick={onPickSong} />
+        {#if err}<span class="err">{err}</span>{/if}
       </div>
     {:else if $game.phase === "HOST_RECORDING"}
       <div class="panel">
@@ -133,6 +150,7 @@
         {#key $resyncNonce}
           <RecordControl {busy} useLabel="Use this take" on:done={onSongTake} />
         {/key}
+        <SongPicker {busy} on:pick={onPickSong} />
         {#if err}<span class="err">{err}</span>{/if}
       </div>
     {:else if $game.phase === "REVERSED_PLAYBACK"}
