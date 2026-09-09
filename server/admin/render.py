@@ -74,6 +74,7 @@ _CSS = """
   button { font: inherit; font-weight: 600; padding: 9px 14px; border: 0; border-radius: 8px;
            background: #4c5bd4; color: #fff; cursor: pointer; }
   button.danger { background: #d33f3f; }
+  button.secondary { background: none; color: inherit; border: 1px solid #cfd2e0; }
   button.link { background: none; color: #4c5bd4; padding: 0; }
   button.link.danger { background: none; color: #d33f3f; }
   button.link.refresh { font-size: 1.15rem; line-height: 1; vertical-align: middle; }
@@ -84,6 +85,18 @@ _CSS = """
   .stat { background: #fff; border: 1px solid #e3e5ef; border-radius: 10px; padding: 12px 14px; }
   .stat b { display: block; font-size: 1.3rem; }
   audio { width: 100%; margin: 4px 0; }
+  [hidden] { display: none !important; }
+  .rec-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 10px; }
+  button.rec { background: #d33f3f; }
+  .rec-dot { width: 12px; height: 12px; border-radius: 50%; background: #d33f3f; opacity: .25; }
+  .rec-dot.live { opacity: 1; animation: rec-pulse 1.1s ease-out infinite; }
+  .rec-time { font-variant-numeric: tabular-nums; }
+  @keyframes rec-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(211,63,63,.55); }
+    70% { box-shadow: 0 0 0 10px rgba(211,63,63,0); }
+    100% { box-shadow: 0 0 0 0 rgba(211,63,63,0); }
+  }
+  @media (prefers-reduced-motion: reduce) { .rec-dot.live { animation: none; } }
   @media (prefers-color-scheme: dark) {
     body { background: #0f1020; color: #eef0ff; }
     a { color: #9db0ff; }
@@ -91,9 +104,113 @@ _CSS = """
     th { background: #24264a; }
     input { background: #0f1020; color: #eef0ff; border-color: #2b2d52; }
     button.link { color: #9db0ff; }
+    button.secondary { border-color: #2b2d52; }
     .muted { color: #9aa0c8; }
     header { border-bottom-color: #2b2d52; }
   }
+"""
+
+
+# Vanilla (no build step) in-page recorder for the song-add form. Captures a
+# take with MediaRecorder and drops it into the form's <input type=file> via a
+# DataTransfer, so the existing multipart POST handler is unchanged. Degrades to
+# the plain file input when the page isn't a secure context (plain-http LAN).
+SONG_RECORDER_JS = """
+(function () {
+  var form = document.getElementById('song-add');
+  if (!form) return;
+  var fileInput = form.querySelector('input[type=file]');
+  var fileRow = document.getElementById('rec-file-row');
+  var ui = document.getElementById('rec-ui');
+  var startBtn = document.getElementById('rec-start');
+  var stopBtn = document.getElementById('rec-stop');
+  var redoBtn = document.getElementById('rec-redo');
+  var dot = document.getElementById('rec-dot');
+  var timeEl = document.getElementById('rec-time');
+  var statusEl = document.getElementById('rec-status');
+  var preview = document.getElementById('rec-preview');
+
+  var ok = window.isSecureContext === true && navigator.mediaDevices &&
+           navigator.mediaDevices.getUserMedia && window.MediaRecorder &&
+           window.DataTransfer;
+  if (!ok) { ui.hidden = true; return; }
+
+  var MIMES = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/aac','audio/ogg;codecs=opus'];
+  function pickMime() {
+    for (var i = 0; i < MIMES.length; i++) {
+      if (MediaRecorder.isTypeSupported(MIMES[i])) return MIMES[i];
+    }
+    return '';
+  }
+  function extFor(m) {
+    m = (m || '').toLowerCase();
+    if (m.indexOf('webm') >= 0) return 'webm';
+    if (m.indexOf('mp4') >= 0 || m.indexOf('m4a') >= 0) return 'mp4';
+    if (m.indexOf('aac') >= 0) return 'aac';
+    if (m.indexOf('ogg') >= 0 || m.indexOf('opus') >= 0) return 'ogg';
+    return 'webm';
+  }
+  function fmt(s) { return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+
+  var rec = null, chunks = [], stream = null, t0 = 0, timer = null, url = '';
+
+  function stopTimer() { if (timer) { clearInterval(timer); timer = null; } }
+  function toIdle() {
+    stopTimer();
+    if (url) { URL.revokeObjectURL(url); url = ''; }
+    chunks = [];
+    timeEl.textContent = '0:00';
+    dot.classList.remove('live');
+    startBtn.hidden = false; stopBtn.hidden = true; redoBtn.hidden = true;
+    preview.hidden = true; preview.removeAttribute('src');
+    if (fileRow) fileRow.hidden = false;
+  }
+
+  startBtn.addEventListener('click', function () {
+    statusEl.textContent = 'Opening the mic…';
+    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })
+      .then(function (s) {
+        stream = s; chunks = [];
+        var mime = pickMime();
+        rec = mime ? new MediaRecorder(s, { mimeType: mime }) : new MediaRecorder(s);
+        rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+        rec.onstop = function () {
+          stream.getTracks().forEach(function (tr) { tr.stop(); });
+          stopTimer();
+          var type = rec.mimeType || mime || 'audio/webm';
+          var blob = new Blob(chunks, { type: type });
+          var file = new File([blob], 'recording.' + extFor(type), { type: type });
+          var dt = new DataTransfer(); dt.items.add(file);
+          fileInput.files = dt.files;
+          url = URL.createObjectURL(blob);
+          preview.src = url; preview.hidden = false;
+          dot.classList.remove('live');
+          startBtn.hidden = true; stopBtn.hidden = true; redoBtn.hidden = false;
+          if (fileRow) fileRow.hidden = true;
+          statusEl.textContent = 'Recorded take ready — it uploads when you click "Add song".';
+        };
+        rec.start(250);
+        t0 = Date.now(); timeEl.textContent = '0:00';
+        dot.classList.add('live');
+        startBtn.hidden = true; stopBtn.hidden = false; redoBtn.hidden = true;
+        statusEl.textContent = 'Recording…';
+        timer = setInterval(function () {
+          timeEl.textContent = fmt(Math.floor((Date.now() - t0) / 1000));
+        }, 250);
+      })
+      .catch(function (err) {
+        statusEl.textContent = 'Mic unavailable: ' + ((err && err.message) || err);
+      });
+  });
+  stopBtn.addEventListener('click', function () {
+    if (rec && rec.state !== 'inactive') rec.stop();
+  });
+  redoBtn.addEventListener('click', function () {
+    try { fileInput.value = ''; } catch (e) {}
+    statusEl.textContent = '';
+    toIdle();
+  });
+})();
 """
 
 

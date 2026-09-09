@@ -360,13 +360,26 @@ def build_admin_router(
         rows = songs.list()
 
         add_form = (
-            '<h2>Add a song</h2>'
-            '<form class="card" method="post" action="/admin/songs" '
+            "<h2>Add a song</h2>"
+            '<form class="card" id="song-add" method="post" action="/admin/songs" '
             'enctype="multipart/form-data">'
             f'<input type="hidden" name="csrf" value="{esc(csrf)}">'
             '<p><input name="name" placeholder="song name (optional)"></p>'
-            '<p><input type="file" name="file" accept="audio/*" required></p>'
-            "<button type=submit>Add song</button></form>"
+            '<div id="rec-ui">'
+            '<p class="muted">Record it here (like in the game), or choose a file:</p>'
+            '<div class="rec-row">'
+            '<button type="button" id="rec-start" class="rec">● Record</button>'
+            '<button type="button" id="rec-stop" class="rec" hidden>■ Stop</button>'
+            '<span id="rec-dot" class="rec-dot"></span>'
+            '<span id="rec-time" class="rec-time">0:00</span>'
+            '<button type="button" id="rec-redo" class="secondary" hidden>Re-record</button>'
+            "</div>"
+            '<audio id="rec-preview" controls hidden></audio>'
+            '<p id="rec-status" class="muted"></p>'
+            "</div>"
+            '<p id="rec-file-row"><input type="file" name="file" accept="audio/*" required></p>'
+            "<button type=submit>Add song</button>"
+            f"</form><script>{render.SONG_RECORDER_JS}</script>"
         )
         err = f'<p class="err">{esc(error)}</p>' if error else ""
 

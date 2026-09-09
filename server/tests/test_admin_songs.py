@@ -46,6 +46,14 @@ def _clear_library():
         song_library.delete(s["slug"])
 
 
+def test_add_form_offers_inline_recorder_and_file_fallback(client, admin_creds):
+    _login(client, admin_creds)
+    page = client.get("/admin/songs").text
+    assert 'id="song-add"' in page
+    assert 'id="rec-start"' in page and "MediaRecorder" in page
+    assert 'type="file" name="file"' in page  # no-JS / plain-http fallback kept
+
+
 def test_add_then_list_and_stream(client, admin_creds, webm_bytes):
     _login(client, admin_creds)
     r = _add(client, "Twinkle Twinkle", webm_bytes, _csrf(client))
