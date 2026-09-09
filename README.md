@@ -7,7 +7,7 @@ attempt is reversed again so the group can judge who landed closest.
 Architecture, options, and the full roadmap live in the plan doc:
 `~/.claude/plans/i-want-to-create-vectorized-parnas.md`.
 
-## Status — Phase 6 (admin portal)
+## Status — Phase 7 (online hosting)
 
 Done:
 
@@ -50,8 +50,16 @@ Done:
   **pick a library song** instead of recording the original — `SongPicker`
   sits under the recorder on those screens.
 
+- **Phase 7** — deployable: a multi-stage `Dockerfile` (Node builds the SPA,
+  Python runtime bundles ffmpeg via `imageio-ffmpeg`) + `docker-compose.yml`
+  with a persistent `/data` volume, and an `S3Storage` backend
+  (`ISAFAN_STORAGE=s3`, works with AWS S3 / Cloudflare R2 / MinIO) so clips can
+  live in object storage instead of the volume. Runs as a **single instance**
+  (see "Deploy" — the WebSocket hub and game registry are in-process); TLS is
+  terminated by the platform or a proxy in front.
+
 Not yet: `relay` mode (split a library song into per-player lines — design
-settled in `backlog.md`, not built), online hosting (Phase 7).
+settled in `backlog.md`, not built).
 
 > On a plain-http LAN page the browser blocks in-page recording, so the record
 > control falls back to the phone's own voice recorder via a file input (see
@@ -98,6 +106,33 @@ npm --prefix web run build            # emits web/dist
 ```
 
 Open <http://localhost:8000>.
+
+## Deploy (Docker)
+
+```bash
+docker compose up --build             # builds the SPA + image, runs on :8000
+```
+
+Edit `docker-compose.yml` first: set `ISAFAN_PUBLIC_URL` to the address players
+will actually reach, and (to enable the `/admin` portal) `ISAFAN_ADMIN_USER` +
+`ISAFAN_ADMIN_PASSWORD_HASH` (`python -m server.admin.hashpw` prints the line).
+The image bundles ffmpeg, so there is nothing else to install.
+
+- **TLS** is not handled by the app. Put it behind your platform's load
+  balancer or a reverse proxy (Caddy, Traefik, nginx) that terminates HTTPS and
+  forwards to `:8000` — including the `/ws` WebSocket upgrade.
+- **Storage.** By default clips + `game.json` + the song library go in the
+  `/data` volume. To keep them in object storage instead, set
+  `ISAFAN_STORAGE=s3` and the `ISAFAN_S3_*` vars (AWS S3, Cloudflare R2, or
+  MinIO — omit the access-key vars to use an attached IAM role). The retention
+  sweep and the admin portal work the same either way.
+- **Single instance only.** The live-gameplay state — the WebSocket hub's
+  connections and the in-memory game registry — is per-process, so run exactly
+  one replica (`scale: 1`, no rolling deploy overlap). A restart is safe:
+  in-progress rooms drop but all stored audio/metadata survives via `Storage`.
+  Horizontal scale would need a shared pub/sub + registry (e.g. Redis) and is
+  deliberately out of scope until the load calls for it — one small container
+  comfortably handles a party.
 
 ## Play from a phone (same Wi-Fi)
 
@@ -155,14 +190,16 @@ data dir (no `./data` writes).
 
 All optional — see `.env.example`. Read at startup from the environment or a
 local `.env` file. Notable: `ISAFAN_PUBLIC_URL` (join-link / QR base address),
-`ISAFAN_PORT`, `ISAFAN_MAX_PLAYERS`, `ISAFAN_DATA_DIR`.
+`ISAFAN_PORT`, `ISAFAN_MAX_PLAYERS`, `ISAFAN_DATA_DIR`, `ISAFAN_STORAGE`
+(`local` | `s3`), and the `ISAFAN_ADMIN_*` / `ISAFAN_S3_*` groups.
 
 ## Layout
 
 ```
-server/   FastAPI app — config, storage, game model, ws hub, audio, retention
+server/   FastAPI app — config, storage (local + s3), game model, ws hub, audio
 server/admin/   server-rendered /admin portal (auth, status, recordings, songs)
 server/tests/   pytest suite
 web/      Svelte + Vite SPA — routes/, lib/ (socket client, router, components)
-data/     runtime only (gitignored): per-game folders, game.json + audio clips
+data/     runtime only (gitignored): per-game folders + game.json, song library
+Dockerfile, docker-compose.yml   single-instance deploy (see "Deploy")
 ```

@@ -1,0 +1,13 @@
+.git
+.venv
+data/
+.env
+.env.*
+!.env.example
+web/node_modules
+web/dist
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.claude
+*.md

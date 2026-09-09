@@ -1,0 +1,32 @@
+# Single-instance deploy. Live gameplay state (the WebSocket hub + the game
+# registry) is in-process, so run exactly one replica; put TLS termination in
+# front of it (your platform's load balancer, or a reverse proxy like Caddy).
+services:
+  isafan:
+    build: .
+    image: isafan
+    ports:
+      - "8000:8000"
+    environment:
+      # Public address players reach this at — sets the QR / join link.
+      ISAFAN_PUBLIC_URL: "https://play.example.com"
+      ISAFAN_DATA_DIR: /data
+      # --- admin portal (off until both are set) ---
+      # Generate the hash line with: python -m server.admin.hashpw
+      # ISAFAN_ADMIN_USER: "admin"
+      # ISAFAN_ADMIN_PASSWORD_HASH: "scrypt$...."
+      # --- storage: keep clips in S3/R2 instead of the volume ---
+      # ISAFAN_STORAGE: s3
+      # ISAFAN_S3_BUCKET: isafan-prod
+      # ISAFAN_S3_REGION: auto
+      # ISAFAN_S3_ENDPOINT: "https://<account>.r2.cloudflarestorage.com"
+      # ISAFAN_S3_ACCESS_KEY: "..."
+      # ISAFAN_S3_SECRET_KEY: "..."
+    volumes:
+      # Holds per-game folders + the song library when ISAFAN_STORAGE=local.
+      # Unused (but harmless) with ISAFAN_STORAGE=s3.
+      - isafan-data:/data
+    restart: unless-stopped
+
+volumes:
+  isafan-data:

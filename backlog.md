@@ -76,12 +76,23 @@ what's **not** built yet. Rough priority order within each section.
 
 ### Phase 7 — Online hosting
 
-- [ ] **`S3Storage`** implementation behind the existing `Storage` interface;
-      select via `ISAFAN_STORAGE=s3` + bucket/credentials config.
-- [ ] **Dockerfile** (app + bundled ffmpeg + built SPA) and a deploy to a
-      managed container host with real TLS and a small persistent volume.
-- [ ] Revisit whether game state needs a shared store (Redis) once there's
-      more than one instance; today it's in-process only.
+- [x] **`S3Storage`** (`server/s3storage.py`) behind the `Storage` interface —
+      `ISAFAN_STORAGE=s3` + `ISAFAN_S3_BUCKET/REGION/ENDPOINT/PREFIX/ACCESS_KEY
+      /SECRET_KEY`. Works with AWS S3, Cloudflare R2, MinIO. Callers were first
+      moved off `local_path` onto `Storage.file_response` / `modified_at` /
+      `total_bytes` so both backends are interchangeable.
+- [x] **Dockerfile** (multi-stage: Node builds the SPA, Python runtime with
+      ffmpeg bundled via `imageio-ffmpeg`) + `docker-compose.yml` with a
+      persistent `/data` volume. TLS is left to the platform / a reverse proxy
+      in front (documented in README "Deploy"). Actual cloud deploy is the
+      operator's step.
+- [x] Shared store (Redis) — **decided against for now.** The WS hub's
+      connections and the game registry are in-process; a second instance can't
+      fan out WS frames or resolve a rejoin to the right process. A party's load
+      fits one small container, and stored audio/metadata already survives
+      restarts via `Storage`. Run `scale: 1`; revisit only with real evidence
+      of need (would want Redis pub/sub for the hub + a shared/synced registry,
+      or sticky routing by room code).
 
 ### Known gaps / smaller polish
 
