@@ -38,7 +38,8 @@ class Settings:
     create_rate_window: int       # seconds for that burst to refill
     ffmpeg_path: str              # override; "" = bundled (imageio-ffmpeg) or PATH
     audio_sample_rate: int        # canonical WAV sample rate
-    max_clip_seconds: int         # reject recordings longer than this
+    max_clip_seconds: int         # reject in-game recordings longer than this
+    max_song_seconds: int         # reject admin song-library uploads longer than this
     max_upload_bytes: int         # reject uploads larger than this
     ssl_certfile: str             # set both to serve HTTPS (e.g. an mkcert pair)
     ssl_keyfile: str              # so phones on the LAN can record in-page
@@ -103,6 +104,7 @@ def load_settings() -> Settings:
         ffmpeg_path=os.environ.get("ISAFAN_FFMPEG", "").strip(),
         audio_sample_rate=_int("ISAFAN_AUDIO_SR", 16_000),
         max_clip_seconds=_int("ISAFAN_MAX_CLIP_SECONDS", 45),
+        max_song_seconds=_int("ISAFAN_MAX_SONG_SECONDS", 60),
         max_upload_bytes=_int("ISAFAN_MAX_UPLOAD_BYTES", 25 * 1024 * 1024),
         ssl_certfile=os.environ.get("ISAFAN_SSL_CERT", "").strip(),
         ssl_keyfile=os.environ.get("ISAFAN_SSL_KEY", "").strip(),
