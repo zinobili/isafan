@@ -44,25 +44,24 @@ def test_ttl_zero_disables_purge(reg):
     assert reg.get(g.code) is g
 
 
-def test_falls_back_to_folder_mtime_when_json_unreadable(reg, tmp_path):
+def test_falls_back_to_file_mtime_when_json_unreadable(reg, tmp_path):
+    import os
+
     storage = reg._storage
     g = reg.create()
     storage.delete(f"games/{g.code}/game.json")  # only audio left, no metadata
     storage.put_bytes(f"games/{g.code}/original_reversed.wav", b"\x00")
-    old_mtime = time.time() - 48 * 3600
-    import os
-
-    os.utime(tmp_path / "games" / g.code, (old_mtime, old_mtime))
+    old = time.time() - 48 * 3600
+    os.utime(tmp_path / "games" / g.code / "original_reversed.wav", (old, old))
 
     assert purge_expired(reg, storage, ttl_seconds=24 * 3600) == [g.code]
     assert not (tmp_path / "games" / g.code).exists()
 
 
-def test_missing_metadata_and_no_local_path_is_left_alone(reg):
-    """A folder we can't age (no json, mtime lookup fails) is never deleted."""
+def test_missing_metadata_and_no_mtime_is_left_alone(reg):
+    """A folder we can't age (no json, no readable file times) is never deleted."""
     storage = reg._storage
     g = reg.create()
     storage.delete(f"games/{g.code}/game.json")
-    # patch local_path to hide the folder from the mtime fallback
-    storage.local_path = lambda key: None
+    storage.modified_at = lambda key: None  # hide every file time
     assert purge_expired(reg, storage, ttl_seconds=1) == []

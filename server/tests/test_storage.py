@@ -49,6 +49,25 @@ def test_size(store):
     assert store.size("games/ABCD") is None             # a dir, not a file
 
 
+def test_modified_at_and_total_bytes(store):
+    import time
+
+    assert store.modified_at("nope.bin") is None
+    store.put_bytes("a/one.wav", b"\x00" * 100)
+    store.put_bytes("a/two.wav", b"\x00" * 50)
+    assert abs(store.modified_at("a/one.wav") - time.time()) < 5
+    assert store.total_bytes() == 150
+
+
+def test_file_response(store):
+    assert store.file_response("missing.wav", media_type="audio/wav") is None
+    store.put_bytes("games/ABCD/original_reversed.wav", b"RIFFxxxx")
+    resp = store.file_response("games/ABCD/original_reversed.wav", media_type="audio/wav")
+    assert resp is not None
+    assert resp.media_type == "audio/wav"
+    assert resp.headers["cache-control"] == "no-store"
+
+
 def test_local_path_is_under_root(store, tmp_path):
     p = store.local_path("games/ABCD/x.wav")
     assert p is not None and tmp_path.resolve() in p.parents

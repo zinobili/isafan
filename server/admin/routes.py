@@ -7,7 +7,7 @@ import time
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from ..clips import is_allowed_clip_name, media_type_for
 from ..config import settings
@@ -295,12 +295,12 @@ def build_admin_router(
     def game_audio(code: str, name: str, _user: str = Depends(auth.admin_required)):
         if not is_allowed_clip_name(name):
             raise HTTPException(404, "unknown clip")
-        path = storage.local_path(f"games/{code}/{name}")
-        if path is None or not path.is_file():
-            raise HTTPException(404, "clip not found")
-        return FileResponse(
-            path, media_type=media_type_for(name), headers={"Cache-Control": "no-store"}
+        resp = storage.file_response(
+            f"games/{code}/{name}", media_type=media_type_for(name)
         )
+        if resp is None:
+            raise HTTPException(404, "clip not found")
+        return resp
 
     # --- song library (protected) ----------------------------------
 
@@ -556,11 +556,9 @@ def build_admin_router(
         key = songs.clip_key(slug, kind)
         if key is None:
             raise HTTPException(404, "unknown song clip")
-        path = storage.local_path(key)
-        if path is None or not path.is_file():
+        resp = storage.file_response(key, media_type=media_type_for(key))
+        if resp is None:
             raise HTTPException(404, "clip not found")
-        return FileResponse(
-            path, media_type=media_type_for(key), headers={"Cache-Control": "no-store"}
-        )
+        return resp
 
     return router

@@ -25,20 +25,19 @@ last_sweep_at: float | None = None
 
 def _game_age_seconds(storage: Storage, code: str, now: float) -> float | None:
     """Best-effort age of a stored game. Prefers `createdAt` from game.json;
-    falls back to the folder's mtime. Returns None when neither is readable, so
-    the caller leaves that folder alone rather than guessing."""
+    falls back to the most recent last-modified time across the folder's files.
+    Returns None when nothing is readable, so the caller leaves it alone."""
     try:
         meta = json.loads(storage.get_text(f"{_GAMES_PREFIX}/{code}/game.json"))
         return max(0.0, now - float(meta["createdAt"]))
     except Exception:
         pass
-    try:
-        path = storage.local_path(f"{_GAMES_PREFIX}/{code}")
-        if path is not None and path.exists():
-            return max(0.0, now - path.stat().st_mtime)
-    except OSError:
-        pass
-    return None
+    mtimes = [
+        m
+        for child in storage.list_children(f"{_GAMES_PREFIX}/{code}")
+        if (m := storage.modified_at(f"{_GAMES_PREFIX}/{code}/{child}")) is not None
+    ]
+    return max(0.0, now - max(mtimes)) if mtimes else None
 
 
 def purge_expired(

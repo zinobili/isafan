@@ -1,12 +1,10 @@
 """Numbers for the admin status page. Split out from the route so it's easy to
-test. The per-game and per-clip figures go through the registry + `Storage`
-interface; the raw disk figures are read from the filesystem directly (local
-storage only — an S3 backend would surface these differently)."""
+test. Everything goes through the registry + `Storage` interface; the free/total
+volume figures are filesystem-only and simply omitted on a non-local backend."""
 
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import time
 from pathlib import Path
@@ -19,17 +17,6 @@ from ..storage import Storage
 
 def _is_clip(name: str) -> bool:
     return name.endswith(".wav") or "_source." in name
-
-
-def _dir_bytes(path: Path) -> int:
-    total = 0
-    for root, _dirs, files in os.walk(path):
-        for name in files:
-            try:
-                total += (Path(root) / name).stat().st_size
-            except OSError:
-                pass
-    return total
 
 
 def collect(
@@ -69,18 +56,21 @@ def collect(
         except Exception:
             pass
 
-    data_dir = settings.data_dir
     try:
-        data_bytes = _dir_bytes(data_dir)
-    except OSError:
+        data_bytes = storage.total_bytes()
+    except Exception:
         data_bytes = 0
-    try:
-        probe = data_dir if data_dir.exists() else Path(data_dir.anchor or ".")
-        usage = shutil.disk_usage(probe)
-        disk_free: int | None = usage.free
-        disk_total: int | None = usage.total
-    except OSError:
-        disk_free = disk_total = None
+
+    disk_free: int | None = None
+    disk_total: int | None = None
+    local_root = storage.local_path("")  # a real dir on a local backend, else None
+    if local_root is not None:
+        try:
+            probe = local_root if local_root.exists() else Path(local_root.anchor or ".")
+            usage = shutil.disk_usage(probe)
+            disk_free, disk_total = usage.free, usage.total
+        except OSError:
+            pass
 
     try:
         songs = json.loads(storage.get_text("assets/songs/manifest.json"))

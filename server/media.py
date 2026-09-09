@@ -17,7 +17,6 @@ from __future__ import annotations
 import time
 
 from fastapi import APIRouter, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
 
 from .clips import is_allowed_clip_name, media_type_for
 from .game import GameRegistry, Phase
@@ -131,13 +130,11 @@ def build_router(
     def get_audio(code: str, name: str):
         if not is_allowed_clip_name(name):
             raise HTTPException(404, "unknown clip")
-        path = storage.local_path(f"games/{code}/{name}")
-        if path is None or not path.is_file():
-            raise HTTPException(404, "clip not found")
-        return FileResponse(
-            path,
-            media_type=media_type_for(name),
-            headers={"Cache-Control": "no-store"},
+        resp = storage.file_response(
+            f"games/{code}/{name}", media_type=media_type_for(name)
         )
+        if resp is None:
+            raise HTTPException(404, "clip not found")
+        return resp
 
     return router
