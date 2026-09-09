@@ -141,4 +141,8 @@ class LocalDiskStorage(Storage):
 def build_storage(backend: str, data_dir: Path) -> Storage:
     if backend == "local":
         return LocalDiskStorage(data_dir)
+    if backend == "s3":
+        from .s3storage import S3Storage
+
+        return S3Storage.from_env()
     raise ValueError(f"unknown storage backend: {backend!r}")

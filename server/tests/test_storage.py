@@ -81,7 +81,11 @@ def test_path_traversal_is_rejected(store):
             store.put_bytes(bad, b"x")
 
 
-def test_build_storage(tmp_path):
+def test_build_storage(tmp_path, monkeypatch):
     assert isinstance(build_storage("local", tmp_path), LocalDiskStorage)
+    with pytest.raises(ValueError):
+        build_storage("nope", tmp_path)
+    # s3 dispatches to S3Storage.from_env, which needs a bucket configured
+    monkeypatch.delenv("ISAFAN_S3_BUCKET", raising=False)
     with pytest.raises(ValueError):
         build_storage("s3", tmp_path)
