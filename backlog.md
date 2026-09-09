@@ -68,8 +68,11 @@ what's **not** built yet. Rough priority order within each section.
       also has a relay line-boundary editor (`{startMs,endMs,label}` rows with
       `#t=` segment preview). Ingest shares `server/ingest.py` with the game
       upload path; `ISAFAN_MAX_SONG_SECONDS` caps reference clips.
-      Still to wire: "pick a song" in the host lobby / solo flow (Preloaded
-      song library feature idea) and the `relay` game mode.
+- [x] **Pick a song in gameplay** — `GET /api/songs` + `POST
+      /api/games/<code>/original/library` copy an enabled library song's clips
+      into the game and advance to `REVERSED_PLAYBACK`. `SongPicker.svelte`
+      on the host LOBBY/HOST_RECORDING screens and the solo original step;
+      no-op when the library is empty. Host-only in multi mode.
 
 ### Phase 7 — Online hosting
 
@@ -116,31 +119,42 @@ know what's coming.
 - [ ] Illustrations: owner supplies them, or start with simple emoji / SVG
       placeholders.
 
-### Preloaded song library
+### Preloaded song library — DONE (Phase 6b)
 
-Host / solo player shouldn't have to record a song on the spot.
+Host / solo player no longer has to record a song on the spot.
 
-- [ ] Reference clips are **added through the admin portal's song library
-      manager** (Phase 6), not dropped in as files. The portal stores each one
-      and pre-computes its reversed + forward WAV.
-- [ ] "Pick a song" option on the host LOBBY screen and the solo `original`
-      step, alongside "record your own".
-- [ ] `game.original` gets populated from the library entry instead of an
-      upload; everything downstream is unchanged.
+- [x] Reference clips are added through the admin portal's song library manager
+      (Phase 6b); it stores each one and pre-computes its reversed + forward WAV.
+- [x] "Pick a song" option on the host LOBBY / HOST_RECORDING screens and the
+      solo `original` step, alongside "record your own" (`SongPicker.svelte`).
+- [x] `game.original` is populated from the library entry (`POST
+      /api/games/<code>/original/library` copies the clips in); everything
+      downstream is unchanged apart from a `songSlug` marker.
 
-### Group relay mode ("everyone sings one line")
+### Group relay mode ("everyone sings one line") — NOT STARTED
 
 Instead of one person mimicking the whole clip, split a song into lines and
 give each player one **reversed line** to sing back; the reveal stitches the
 reversed-attempts in order to reconstruct the whole song (e.g. "Happy Birthday
 to You" — 4 lines, 4 players).
 
-- [ ] New game mode (`relay`) alongside `multi` / `solo`.
-- [ ] The "original" for a relay is a library song with **line-boundary
-      timestamps set in the admin portal's song library manager**.
-- [ ] Assign lines to players (round-robin, or let them claim one).
-- [ ] Each player records only their line; host reveal plays every reversed
-      line back-to-back so the group hears the song rebuilt.
+Design settled (2026-09-10) — build when picked up:
+
+- [ ] **Round style inside a multi game**, not a new top-level mode. Host picks
+      a relay-capable library song (`lineCount > 0`) in a normal multi game and
+      flags `relay`; joins / lobby / reconnect are untouched. The relay state
+      hangs off the game for the current round only.
+- [ ] The "original" is a library song with line-boundary timestamps from the
+      admin song-library editor. On relay start the server slices
+      `line_<i>_forward.wav` + `line_<i>_reversed.wav` from the copied clips
+      (needs `line_<i>_*` added to the `clips.py` allow-list).
+- [ ] **Round-robin auto-assignment**: sort players by join order, `line =
+      index % lineCount`, computed when `AUDIENCE_RECORDING` starts. Fewer
+      players than lines → some lines unsung; more → multiple takers per line.
+      No claim UI.
+- [ ] Each player records only their assigned line (hears `line_<i>_reversed`);
+      the attempt entry carries `lineIndex`. Host reveal plays the reversed
+      attempts back-to-back in line order ("play all").
 - [ ] Scoring stays "audience decides" — vote per player, or just enjoy the
       reconstruction.
 

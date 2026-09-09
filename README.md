@@ -45,10 +45,13 @@ Done:
   (`server/songs.py`, stored under `assets/songs/`). Upload to add, enable /
   disable, rename, delete, inline playback of the reversed / forward / source
   clips, and a per-song relay line-boundary editor. Ingest is shared with the
-  in-game upload path (`server/ingest.py`).
+  in-game upload path (`server/ingest.py`). In gameplay, `GET /api/songs` +
+  `POST /api/games/<code>/original/library` let the host (or a solo player)
+  **pick a library song** instead of recording the original — `SongPicker`
+  sits under the recorder on those screens.
 
-Not yet: wiring the library into gameplay (host "pick a song" + `relay` mode),
-online hosting (Phase 7).
+Not yet: `relay` mode (split a library song into per-player lines — design
+settled in `backlog.md`, not built), online hosting (Phase 7).
 
 > On a plain-http LAN page the browser blocks in-page recording, so the record
 > control falls back to the phone's own voice recorder via a file input (see
