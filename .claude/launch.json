@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "isafan",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "server.main:app",
+        "--port",
+        "8000",
+        "--reload",
+        "--reload-dir",
+        "server"
+      ],
+      "port": 8000,
+      "autoPort": false
+    }
+  ]
+}
