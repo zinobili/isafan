@@ -12,103 +12,16 @@ playerId. Solo mode (one device, pass-the-phone) skips both checks.
 
 from __future__ import annotations
 
-import tempfile
 import time
-from pathlib import Path
 
-import anyio
 from fastapi import APIRouter, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from . import audio
-from .clips import (
-    EXT_BY_MIME,
-    MEDIA_TYPE_BY_EXT,
-    SOURCE_EXTS,
-    is_allowed_clip_name,
-    media_type_for,
-)
-from .config import settings
+from .clips import is_allowed_clip_name, media_type_for
 from .game import GameRegistry, Phase
+from .ingest import ingest_reversed
 from .storage import Storage
 from .ws import Hub
-
-async def _read_capped(file: UploadFile, limit: int) -> bytes:
-    # Reject early when the multipart part declares a size over the limit, so an
-    # oversized upload doesn't get buffered up to `limit` first. The streaming
-    # check below stays the real guard (a client can lie about / omit the size).
-    if file.size is not None and file.size > limit:
-        raise HTTPException(413, f"recording too large (limit {limit} bytes)")
-    buf = bytearray()
-    while chunk := await file.read(1 << 16):
-        buf += chunk
-        if len(buf) > limit:
-            raise HTTPException(413, f"recording too large (limit {limit} bytes)")
-    return bytes(buf)
-
-
-def _ext_for(file: UploadFile) -> str:
-    if file.content_type:
-        base = EXT_BY_MIME.get(file.content_type.split(";")[0].strip().lower())
-        if base:
-            return base
-    suffix = Path(file.filename or "").suffix.lstrip(".").lower()
-    return suffix if suffix in MEDIA_TYPE_BY_EXT else "bin"
-
-
-async def _ingest_reversed(
-    file: UploadFile,
-    code: str,
-    storage: Storage,
-    *,
-    source_key: str,
-    reversed_key: str,
-    forward_key: str | None = None,
-) -> tuple[float, str]:
-    """Read an upload, store it, produce + store its reversed WAV (and, if
-    `forward_key` is given, a non-reversed WAV too — used so the reveal screen
-    can play the original the way it was actually sung). Returns
-    (duration_seconds, source_ext)."""
-    if not audio.ffmpeg_available():
-        raise HTTPException(503, "audio processing unavailable (ffmpeg missing)")
-
-    raw = await _read_capped(file, settings.max_upload_bytes)
-    if not raw:
-        raise HTTPException(400, "empty upload")
-    ext = _ext_for(file)
-
-    with tempfile.TemporaryDirectory() as tmp:
-        src = Path(tmp) / f"src.{ext}"
-        src.write_bytes(raw)
-        out = Path(tmp) / "reversed.wav"
-
-        # ffmpeg is blocking; run it off the event loop so concurrent requests
-        # (e.g. the reveal page loading every clip at once) aren't stalled.
-        try:
-            await anyio.to_thread.run_sync(audio.reverse_to_wav, src, out)
-        except audio.FfmpegError:
-            raise HTTPException(400, "could not read that file as audio")
-
-        duration = audio.wav_duration_seconds(out)
-        if not duration:
-            raise HTTPException(400, "recording was empty")
-        if duration > settings.max_clip_seconds:
-            raise HTTPException(
-                400, f"recording is {duration:.0f}s; limit is {settings.max_clip_seconds}s"
-            )
-
-        storage.put_bytes(f"{source_key}.{ext}", raw)
-        storage.put_bytes(reversed_key, out.read_bytes())
-
-        if forward_key:
-            fwd = Path(tmp) / "forward.wav"
-            try:
-                await anyio.to_thread.run_sync(audio.transcode_to_wav, src, fwd)
-                storage.put_bytes(forward_key, fwd.read_bytes())
-            except audio.FfmpegError:
-                pass  # non-fatal — the forward copy is a comparison aid
-
-    return duration, ext
 
 
 def build_router(registry: GameRegistry, storage: Storage, hub: Hub) -> APIRouter:
@@ -122,8 +35,8 @@ def build_router(registry: GameRegistry, storage: Storage, hub: Hub) -> APIRoute
         if game.mode != "solo" and playerId != game.host_id:
             raise HTTPException(403, "only the host records the original")
 
-        duration, ext = await _ingest_reversed(
-            file, code, storage,
+        duration, ext = await ingest_reversed(
+            file, storage,
             source_key=f"games/{code}/original_source",
             reversed_key=f"games/{code}/original_reversed.wav",
             forward_key=f"games/{code}/original_forward.wav",
@@ -166,8 +79,8 @@ def build_router(registry: GameRegistry, storage: Storage, hub: Hub) -> APIRoute
                 game.attempts = [a for a in game.attempts if a["id"] != prev["id"]]
 
         eid = game.new_attempt_id()
-        duration, ext = await _ingest_reversed(
-            file, code, storage,
+        duration, ext = await ingest_reversed(
+            file, storage,
             source_key=f"games/{code}/attempt_{eid}_source",
             reversed_key=f"games/{code}/attempt_{eid}_reversed.wav",
         )
