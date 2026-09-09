@@ -1,11 +1,22 @@
 """Admin song library pages: add / list / rename / enable / delete + streaming."""
 
 import re
+from urllib.parse import urlencode
 
 import pytest
 
 from server.admin import auth
 from server.main import song_library, storage
+
+_FORM_CT = {"content-type": "application/x-www-form-urlencoded"}
+
+
+def _post_pairs(client, url, pairs):
+    """POST repeated form fields the way a browser <form> does (httpx's `data=`
+    can't send duplicate keys)."""
+    return client.post(
+        url, content=urlencode(pairs), headers=_FORM_CT, follow_redirects=False
+    )
 
 
 def _login(client, creds):
@@ -119,3 +130,53 @@ def test_status_page_reports_song_count(client, admin_creds, webm_bytes):
     _add(client, "Counted", webm_bytes, _csrf(client))
     page = client.get("/admin").text
     assert "Library songs" in page and "1 · 1 enabled" in page
+
+
+def test_relay_lines_save_edit_and_clear(client, admin_creds, webm_bytes):
+    _login(client, admin_creds)
+    _add(client, "Relay", webm_bytes, _csrf(client))
+    csrf = _csrf(client)
+
+    # two lines, submitted out of order — SongLibrary sorts by start
+    r = _post_pairs(
+        client,
+        "/admin/songs/relay/lines",
+        [
+            ("csrf", csrf),
+            ("label", "line 2"), ("startMs", "1200"), ("endMs", "2400"),
+            ("label", "line 1"), ("startMs", "0"), ("endMs", "1200"),
+            ("label", ""), ("startMs", ""), ("endMs", ""),   # blank row -> ignored
+        ],
+    )
+    assert r.status_code == 303 and r.headers["location"] == "/admin/songs/relay"
+    assert song_library.get("relay")["lines"] == [
+        {"startMs": 0, "endMs": 1200, "label": "line 1"},
+        {"startMs": 1200, "endMs": 2400, "label": "line 2"},
+    ]
+
+    detail = client.get("/admin/songs/relay").text
+    assert 'value="1200"' in detail and 'src="/admin/songs/relay/audio/forward#t=0.00,1.20"' in detail
+
+    # clearing both times drops every line
+    _post_pairs(
+        client,
+        "/admin/songs/relay/lines",
+        [("csrf", csrf), ("label", "line 1"), ("startMs", ""), ("endMs", "")],
+    )
+    assert song_library.get("relay")["lines"] == []
+
+
+def test_relay_lines_guarded(client, admin_creds, webm_bytes):
+    _login(client, admin_creds)
+    _add(client, "Guard", webm_bytes, _csrf(client))
+    assert client.post(
+        "/admin/songs/guard/lines", data={"csrf": "0" * 32}, follow_redirects=False
+    ).status_code == 403
+    assert client.post(
+        "/admin/songs/missing/lines", data={"csrf": _csrf(client)}, follow_redirects=False
+    ).status_code == 404
+    # logged-out
+    client.cookies.clear()
+    assert client.post(
+        "/admin/songs/guard/lines", data={"csrf": "x"}, follow_redirects=False
+    ).status_code == 303

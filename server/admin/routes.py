@@ -317,6 +317,41 @@ def build_admin_router(
         )
         return f"<div class=card>{rows}</div>"
 
+    def _relay_lines_form(slug: str, song: dict, csrf: str) -> str:
+        def row(ln: dict) -> str:
+            label = esc(str(ln.get("label", "")))
+            start = ln.get("startMs", "")
+            end = ln.get("endMs", "")
+            if start != "" and end != "":
+                seg = (
+                    f'<audio controls preload="none" src="/admin/songs/{esc(slug)}'
+                    f'/audio/forward#t={int(start) / 1000:.2f},{int(end) / 1000:.2f}">'
+                    "</audio>"
+                )
+            else:
+                seg = '<span class="muted">—</span>'
+            return (
+                "<tr>"
+                f'<td><input name="label" value="{label}" size="14"></td>'
+                f'<td><input name="startMs" value="{start}" size="7" inputmode="numeric"></td>'
+                f'<td><input name="endMs" value="{end}" size="7" inputmode="numeric"></td>'
+                f"<td>{seg}</td></tr>"
+            )
+
+        existing = song.get("lines") or []
+        rows = "".join(row(ln) for ln in [*existing, {}, {}])
+        return (
+            "<h2>Relay lines</h2>"
+            '<p class="muted">Split the song into lines for relay mode — each '
+            "player sings one reversed line. Times are milliseconds into the clip; "
+            "clear both times to drop a line. Preview jumps to the line start.</p>"
+            f'<form method="post" action="/admin/songs/{esc(slug)}/lines">'
+            f'<input type="hidden" name="csrf" value="{esc(csrf)}">'
+            "<table><tr><th>Label</th><th>Start&nbsp;ms</th><th>End&nbsp;ms</th>"
+            f"<th>Preview</th></tr>{rows}</table>"
+            '<p><button type="submit">Save lines</button></p></form>'
+        )
+
     @router.get("/songs", response_class=HTMLResponse)
     def songs_list(
         request: Request, error: str = "", user: str = Depends(auth.admin_required)
@@ -431,7 +466,7 @@ def build_admin_router(
             f'<p>{rename} &nbsp; {toggle} &nbsp; {delete}</p>'
         )
         body = (
-            head + _song_audio_block(slug)
+            head + _song_audio_block(slug) + _relay_lines_form(slug, song, csrf)
             + '<p style="margin-top:20px"><a href="/admin/songs">← all songs</a></p>'
         )
         return render.page(f"Song {song['name']}", body, user=user, csrf=csrf)
@@ -473,6 +508,33 @@ def build_admin_router(
             raise HTTPException(403, "bad CSRF token")
         songs.delete(slug)
         return RedirectResponse("/admin/songs", status_code=303)
+
+    @router.post("/songs/{slug}/lines")
+    async def save_song_lines(
+        slug: str,
+        request: Request,
+        csrf: str = Form(""),
+        _user: str = Depends(auth.admin_required),
+    ):
+        if not auth.check_csrf(request, csrf):
+            raise HTTPException(403, "bad CSRF token")
+        form = await request.form()  # FastAPI cached this; getlist() for repeats
+        lines = []
+        for label, start, end in zip(
+            form.getlist("label"), form.getlist("startMs"), form.getlist("endMs")
+        ):
+            start, end = start.strip(), end.strip()
+            if not start and not end:
+                continue  # a fully-blank row means "no line here"
+            try:
+                lines.append(
+                    {"startMs": int(start or 0), "endMs": int(end or 0), "label": label}
+                )
+            except ValueError:
+                continue
+        if songs.set_lines(slug, lines) is None:
+            raise HTTPException(404, "no song with that slug")
+        return RedirectResponse(f"/admin/songs/{slug}", status_code=303)
 
     @router.get("/songs/{slug}/audio/{kind}")
     def song_audio(

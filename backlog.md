@@ -61,12 +61,15 @@ what's **not** built yet. Rough priority order within each section.
 - [x] **Delete now** — CSRF-guarded `POST /admin/games/<code>/delete` (whole
       game + `registry.drop`) and `.../clips/<name>/delete` (one file), both via
       the `Storage` interface. Buttons on the browser pages.
-- [ ] **Song library manager** — DEFERRED to a 6b pass (content tooling, not
-      safety). This is where the preloaded songs and relay material get
-      prepared (see "Feature ideas"). Add / record / re-upload a reference
-      clip, name it, listen back, enable / disable it, and for relay songs mark
-      the line boundaries. Writes go through `Storage` (`assets/songs/<slug>/…`
-      + a manifest) so the game code just reads them.
+- [x] **Song library manager** (Phase 6b) — `server/songs.py` (`SongLibrary`
+      over `Storage`, manifest + per-slug `source`/`reversed`/`forward` clips
+      under `assets/songs/`, outside `games/`). `/admin/songs`: upload to add,
+      enable/disable, rename, delete, inline playback; `/admin/songs/<slug>`
+      also has a relay line-boundary editor (`{startMs,endMs,label}` rows with
+      `#t=` segment preview). Ingest shares `server/ingest.py` with the game
+      upload path; `ISAFAN_MAX_SONG_SECONDS` caps reference clips.
+      Still to wire: "pick a song" in the host lobby / solo flow (Preloaded
+      song library feature idea) and the `relay` game mode.
 
 ### Phase 7 — Online hosting
 

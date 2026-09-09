@@ -7,7 +7,7 @@ attempt is reversed again so the group can judge who landed closest.
 Architecture, options, and the full roadmap live in the plan doc:
 `~/.claude/plans/i-want-to-create-vectorized-parnas.md`.
 
-## Status — Phase 6a (admin portal)
+## Status — Phase 6 (admin portal)
 
 Done:
 
@@ -41,8 +41,14 @@ Done:
   disk + clip usage, next purge); a recordings browser with inline playback of
   every stored take; and CSRF-guarded "delete now" for a single clip or a whole
   game. All storage access goes through the `Storage` interface.
+- **Phase 6b** — `/admin/songs`: a preloaded reference-song library
+  (`server/songs.py`, stored under `assets/songs/`). Upload to add, enable /
+  disable, rename, delete, inline playback of the reversed / forward / source
+  clips, and a per-song relay line-boundary editor. Ingest is shared with the
+  in-game upload path (`server/ingest.py`).
 
-Not yet: admin song-library manager (Phase 6b), online hosting (Phase 7).
+Not yet: wiring the library into gameplay (host "pick a song" + `relay` mode),
+online hosting (Phase 7).
 
 > On a plain-http LAN page the browser blocks in-page recording, so the record
 > control falls back to the phone's own voice recorder via a file input (see
@@ -152,7 +158,7 @@ local `.env` file. Notable: `ISAFAN_PUBLIC_URL` (join-link / QR base address),
 
 ```
 server/   FastAPI app — config, storage, game model, ws hub, audio, retention
-server/admin/   server-rendered /admin portal (auth, status, recordings, delete)
+server/admin/   server-rendered /admin portal (auth, status, recordings, songs)
 server/tests/   pytest suite
 web/      Svelte + Vite SPA — routes/, lib/ (socket client, router, components)
 data/     runtime only (gitignored): per-game folders, game.json + audio clips
