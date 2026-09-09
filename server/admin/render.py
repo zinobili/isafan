@@ -76,7 +76,8 @@ _CSS = """
   button.danger { background: #d33f3f; }
   button.link { background: none; color: #4c5bd4; padding: 0; }
   button.link.danger { background: none; color: #d33f3f; }
-  button.link.refresh { font-size: 1.15rem; line-height: 1; margin-left: -6px; }
+  button.link.refresh { font-size: 1.15rem; line-height: 1; vertical-align: middle; }
+  h1 .refresh { margin: 0 6px; }
   .muted { color: #6b7080; }
   .err { color: #d33f3f; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
@@ -102,8 +103,6 @@ def page(title: str, body: str, *, user: str | None = None, csrf: str = "") -> H
         nav = (
             '<nav>'
             '<a href="/admin">Status</a>'
-            '<button class="link refresh" type="button" title="Refresh this page" '
-            'aria-label="Refresh this page" onclick="location.reload()">↻</button>'
             '<a href="/admin/games">Recordings</a>'
             f'<span class="muted">{esc(user)}</span>'
             '<form class="inline" method="post" action="/admin/logout">'
