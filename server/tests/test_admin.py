@@ -6,6 +6,16 @@ from server.admin import auth
 from server.admin.passwords import hash_password, verify_password
 
 
+def test_hashpw_cli_prints_quoted_env_line(capsys):
+    from server.admin import hashpw
+
+    assert hashpw.main(["hashpw", "correct horse battery"]) == 0
+    out = capsys.readouterr().out.strip()
+    assert out.startswith("ISAFAN_ADMIN_PASSWORD_HASH='scrypt$") and out.endswith("'")
+    value = out.split("=", 1)[1].strip().strip("'")
+    assert verify_password("correct horse battery", value)
+
+
 def test_password_hash_roundtrip():
     h = hash_password("hunter2")
     assert h.startswith("scrypt$")

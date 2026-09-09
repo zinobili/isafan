@@ -1,7 +1,10 @@
-"""Print an ISAFAN_ADMIN_PASSWORD_HASH value for your .env file.
+"""Print a ready-to-paste ISAFAN_ADMIN_PASSWORD_HASH line for your .env file.
 
     python -m server.admin.hashpw               # prompt (input hidden)
     python -m server.admin.hashpw 'my password' # from argv (visible in shell history)
+
+Output is the full `ISAFAN_ADMIN_PASSWORD_HASH='scrypt$...'` line, single-quoted
+because the hash contains '$'. Copy the whole line into .env as-is.
 """
 
 from __future__ import annotations
@@ -23,7 +26,9 @@ def main(argv: list[str]) -> int:
     if not password:
         print("empty password", file=sys.stderr)
         return 1
-    print(hash_password(password))
+    # Single-quote it: the hash contains '$', which python-dotenv would otherwise
+    # try to expand as a variable reference in an unquoted .env value.
+    print(f"ISAFAN_ADMIN_PASSWORD_HASH='{hash_password(password)}'")
     return 0
 
 
