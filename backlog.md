@@ -49,7 +49,10 @@ what's **not** built yet. Rough priority order within each section.
 - [x] **Status page** — `/admin`: uptime, active games (phase / round /
       connected / age), stored game folders, stored-clip count + bytes, `data/`
       disk usage + volume headroom, next purge time
-      (`retention.last_sweep_at` + interval). `server/admin/status.py`.
+      (`retention.last_sweep_at` + interval). `server/admin/status.py`. Every
+      admin page has an in-page "↻ Refresh" button; the status heading shows the
+      snapshot time. Solo games register on "Start" (not on first reversal), so
+      they show here while the original is still being recorded.
 - [x] **Recordings browser** — `/admin/games` (code, mode, phase, players,
       takes, age, time-to-expiry); `/admin/games/<code>` shows the original
       (reversed / forward / source) and every attempt as inline `<audio>` plus

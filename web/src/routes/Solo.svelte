@@ -17,6 +17,7 @@
   let idx = 0;
   let votes: number[] = [];
   let busy = false;
+  let starting = false;
   let err = "";
 
   $: clean = names.map((n) => n.trim()).filter(Boolean);
@@ -30,17 +31,29 @@
     names = names.filter((_, j) => j !== i);
   }
 
-  function start() {
-    if (!canStart) return;
-    names = clean;
-    step = "original";
+  // Create the game as soon as the operator commits to playing, so it shows up
+  // as an active game (admin portal) through the record-the-original step —
+  // not only once the first take is reversed.
+  async function start() {
+    if (!canStart || starting) return;
+    starting = true;
+    err = "";
+    try {
+      names = clean;
+      code = (await createSolo()).code;
+      step = "original";
+    } catch (x) {
+      err = x instanceof Error ? x.message : String(x);
+    } finally {
+      starting = false;
+    }
   }
 
   async function onOriginal(e: CustomEvent<{ recording: Recording }>) {
+    if (!code) return;
     busy = true;
     err = "";
     try {
-      code = (await createSolo()).code;
       const r = await uploadOriginal(code, "", e.detail.recording);
       originalUrl = r.url;
       originalForwardUrl = r.forwardUrl;
@@ -77,19 +90,32 @@
   $: topVotes = Math.max(0, ...votes);
   $: leaders = attempts.filter((_, i) => topVotes > 0 && votes[i] === topVotes);
 
-  function playAgain() {
-    code = "";
+  function clearRound() {
     originalUrl = "";
     originalForwardUrl = "";
     attempts = [];
     idx = 0;
     votes = [];
     err = "";
+  }
+
+  async function playAgain() {
+    let next: string;
+    try {
+      next = (await createSolo()).code;
+    } catch (x) {
+      err = x instanceof Error ? x.message : String(x);
+      return; // stay on the reveal screen
+    }
+    clearRound();
+    code = next;
     step = "original";
   }
+
   function newGame() {
     names = ["", ""];
-    playAgain();
+    code = "";
+    clearRound();
     step = "intro";
   }
 </script>
@@ -116,7 +142,10 @@
         {/each}
       </div>
       <button class="secondary" on:click={addName}>+ Add player</button>
-      <button on:click={start} disabled={!canStart}>Start</button>
+      <button on:click={start} disabled={!canStart || starting}>
+        {starting ? "Starting…" : "Start"}
+      </button>
+      {#if err}<span class="err">{err}</span>{/if}
 
       <PrivacyNote />
     </div>
@@ -175,6 +204,7 @@
       <button on:click={playAgain}>Play again (same players)</button>
       <button class="secondary" on:click={newGame}>New game</button>
     </div>
+    {#if err}<span class="err">{err}</span>{/if}
   {/if}
 
   {#if code}<div class="status">game {code}</div>{/if}

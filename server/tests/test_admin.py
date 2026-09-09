@@ -50,6 +50,7 @@ def test_login_success_then_status(client, admin_creds):
     s = client.get("/admin")
     assert s.status_code == 200
     assert "Uptime" in s.text and admin_creds["username"] in s.text
+    assert 'onclick="location.reload()"' in s.text  # in-page refresh button
 
 
 def test_login_wrong_password_leaves_no_session(client, admin_creds):

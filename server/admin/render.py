@@ -102,6 +102,7 @@ def page(title: str, body: str, *, user: str | None = None, csrf: str = "") -> H
             '<nav>'
             '<a href="/admin">Status</a>'
             '<a href="/admin/games">Recordings</a>'
+            '<button class="link" type="button" onclick="location.reload()">↻ Refresh</button>'
             f'<span class="muted">{esc(user)}</span>'
             '<form class="inline" method="post" action="/admin/logout">'
             f'<input type="hidden" name="csrf" value="{esc(csrf)}">'

@@ -139,8 +139,11 @@ def build_admin_router(registry: GameRegistry, storage: Storage) -> APIRouter:
         else:
             games_html = '<h2>Active games</h2><p class="muted">None in memory.</p>'
 
+        as_of = time.strftime("%H:%M:%S")
         return render.page(
-            "Status", f"<h1>Status</h1><div class=grid>{grid}</div>{games_html}",
+            "Status",
+            f'<h1>Status <span class="muted" style="font-size:.8rem;font-weight:400">'
+            f"as of {as_of}</span></h1><div class=grid>{grid}</div>{games_html}",
             user=user, csrf=csrf,
         )
 
