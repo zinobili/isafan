@@ -17,11 +17,13 @@ from .admin.routes import build_admin_router
 from .config import settings
 from .game import GameRegistry
 from .ratelimit import RateLimiter
+from .songs import SongLibrary
 from .storage import build_storage
 from .ws import Hub
 
 storage = build_storage(settings.storage_backend, settings.data_dir)
 registry = GameRegistry(storage, settings.game_code_length, settings.max_players)
+song_library = SongLibrary(storage)
 create_limiter = RateLimiter(settings.create_rate, settings.create_rate_window)
 hub = Hub(registry, create_limiter)
 
@@ -136,7 +138,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
 
 app.include_router(media.build_router(registry, storage, hub))
-app.include_router(build_admin_router(registry, storage))
+app.include_router(build_admin_router(registry, storage, song_library))
 
 
 @app.api_route("/api/{_rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])

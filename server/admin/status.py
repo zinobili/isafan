@@ -82,6 +82,13 @@ def collect(
     except OSError:
         disk_free = disk_total = None
 
+    try:
+        songs = json.loads(storage.get_text("assets/songs/manifest.json"))
+        song_count = len(songs)
+        song_enabled = sum(1 for s in songs if s.get("enabled"))
+    except Exception:
+        song_count = song_enabled = 0
+
     ttl = settings.game_ttl_seconds
     interval = settings.purge_interval_seconds
     last_sweep = retention.last_sweep_at
@@ -94,6 +101,8 @@ def collect(
         "stored_game_count": len(stored_codes),
         "clip_count": clip_count,
         "clip_bytes": clip_bytes,
+        "song_count": song_count,
+        "song_enabled_count": song_enabled,
         "data_bytes": data_bytes,
         "disk_free_bytes": disk_free,
         "disk_total_bytes": disk_total,

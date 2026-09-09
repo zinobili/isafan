@@ -4,13 +4,15 @@ unconfigured (see `auth.is_configured`)."""
 from __future__ import annotations
 
 import time
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from ..clips import is_allowed_clip_name, media_type_for
 from ..config import settings
 from ..game import GameRegistry
+from ..songs import SongLibrary
 from ..storage import Storage
 from . import auth, games, render, status
 from .render import esc, human_bytes, human_duration
@@ -19,7 +21,9 @@ from .render import esc, human_bytes, human_duration
 _STARTED_AT = time.time()
 
 
-def build_admin_router(registry: GameRegistry, storage: Storage) -> APIRouter:
+def build_admin_router(
+    registry: GameRegistry, storage: Storage, songs: SongLibrary
+) -> APIRouter:
     router = APIRouter(prefix="/admin")
 
     def _require_enabled() -> None:
@@ -105,6 +109,10 @@ def build_admin_router(registry: GameRegistry, storage: Storage) -> APIRouter:
             ("Active games", str(len(s["active_games"]))),
             ("Stored game folders", str(s["stored_game_count"])),
             ("Stored clips", f"{s['clip_count']} · {human_bytes(s['clip_bytes'])}"),
+            (
+                "Library songs",
+                f"{s['song_count']} · {s['song_enabled_count']} enabled",
+            ),
             ("data/ on disk", human_bytes(s["data_bytes"])),
             ("Disk", disk),
             ("Next purge", purge),
@@ -292,6 +300,192 @@ def build_admin_router(registry: GameRegistry, storage: Storage) -> APIRouter:
             raise HTTPException(404, "clip not found")
         return FileResponse(
             path, media_type=media_type_for(name), headers={"Cache-Control": "no-store"}
+        )
+
+    # --- song library (protected) ----------------------------------
+
+    def _song_audio_block(slug: str) -> str:
+        rows = "".join(
+            f'<p>{esc(label)} · <span class=muted>{esc(kind)}</span></p>'
+            f'<audio controls preload="none" '
+            f'src="/admin/songs/{esc(slug)}/audio/{kind}"></audio>'
+            for kind, label in (
+                ("reversed", "Reversed (what players mimic)"),
+                ("forward", "Forward (as recorded)"),
+                ("source", "Source upload"),
+            )
+        )
+        return f"<div class=card>{rows}</div>"
+
+    @router.get("/songs", response_class=HTMLResponse)
+    def songs_list(
+        request: Request, error: str = "", user: str = Depends(auth.admin_required)
+    ):
+        csrf = auth.csrf_token(request.cookies.get(auth.COOKIE_NAME))
+        rows = songs.list()
+
+        add_form = (
+            '<h2>Add a song</h2>'
+            '<form class="card" method="post" action="/admin/songs" '
+            'enctype="multipart/form-data">'
+            f'<input type="hidden" name="csrf" value="{esc(csrf)}">'
+            '<p><input name="name" placeholder="song name (optional)"></p>'
+            '<p><input type="file" name="file" accept="audio/*" required></p>'
+            "<button type=submit>Add song</button></form>"
+        )
+        err = f'<p class="err">{esc(error)}</p>' if error else ""
+
+        if not rows:
+            return render.page(
+                "Songs",
+                f'<h1>Songs</h1>{err}<p class="muted">No songs yet.</p>{add_form}',
+                user=user, csrf=csrf,
+            )
+
+        trs = ""
+        for s in rows:
+            slug = s["slug"]
+            toggle = (
+                f'<form class="inline" method="post" '
+                f'action="/admin/songs/{esc(slug)}/enabled">'
+                f'<input type="hidden" name="csrf" value="{esc(csrf)}">'
+                f'<input type="hidden" name="on" value="{0 if s.get("enabled") else 1}">'
+                f'<button class="link" type="submit">'
+                f'{"disable" if s.get("enabled") else "enable"}</button></form>'
+            )
+            trs += (
+                "<tr>"
+                f'<td><a href="/admin/songs/{esc(slug)}">{esc(s["name"])}</a></td>'
+                f'<td>{"yes" if s.get("enabled") else "<span class=muted>no</span>"}</td>'
+                f'<td>{esc(human_duration((s.get("durationMs") or 0) / 1000))}</td>'
+                f'<td>{len(s.get("lines") or [])}</td>'
+                f"<td>{toggle}</td>"
+                "<td>"
+                + render.post_button(
+                    f"/admin/songs/{slug}/delete", "delete", csrf,
+                    danger=True, confirm=f"Delete song \"{s['name']}\"?",
+                )
+                + "</td></tr>"
+            )
+        table = (
+            "<table><tr><th>Name</th><th>Enabled</th><th>Length</th><th>Lines</th>"
+            f"<th></th><th></th></tr>{trs}</table>"
+        )
+        return render.page(
+            "Songs", f"<h1>Songs <span class=muted>({len(rows)})</span></h1>"
+            f"{err}{table}{add_form}",
+            user=user, csrf=csrf,
+        )
+
+    @router.post("/songs")
+    async def add_song(
+        request: Request,
+        file: UploadFile,
+        csrf: str = Form(""),
+        name: str = Form(""),
+        _user: str = Depends(auth.admin_required),
+    ):
+        if not auth.check_csrf(request, csrf):
+            raise HTTPException(403, "bad CSRF token")
+        try:
+            await songs.add(name, file, max_seconds=settings.max_song_seconds)
+        except HTTPException as exc:
+            return RedirectResponse(
+                f"/admin/songs?error={quote(str(exc.detail))}", status_code=303
+            )
+        return RedirectResponse("/admin/songs", status_code=303)
+
+    @router.get("/songs/{slug}", response_class=HTMLResponse)
+    def song_detail(
+        slug: str, request: Request, user: str = Depends(auth.admin_required)
+    ):
+        csrf = auth.csrf_token(request.cookies.get(auth.COOKIE_NAME))
+        song = songs.get(slug)
+        if song is None:
+            raise HTTPException(404, "no song with that slug")
+
+        rename = (
+            f'<form class="inline" method="post" '
+            f'action="/admin/songs/{esc(slug)}/rename">'
+            f'<input type="hidden" name="csrf" value="{esc(csrf)}">'
+            f'<input name="name" value="{esc(song["name"])}" size="28">'
+            "<button type=submit>rename</button></form>"
+        )
+        toggle = (
+            f'<form class="inline" method="post" '
+            f'action="/admin/songs/{esc(slug)}/enabled">'
+            f'<input type="hidden" name="csrf" value="{esc(csrf)}">'
+            f'<input type="hidden" name="on" value="{0 if song.get("enabled") else 1}">'
+            f'<button class="link" type="submit">'
+            f'{"disable" if song.get("enabled") else "enable"}</button></form>'
+        )
+        delete = render.post_button(
+            f"/admin/songs/{slug}/delete", "Delete song", csrf,
+            danger=True, confirm=f"Delete song \"{song['name']}\"?",
+        )
+        head = (
+            f"<h1>{esc(song['name'])}</h1>"
+            f'<p class="muted">{esc(slug)} · '
+            f'{esc(human_duration((song.get("durationMs") or 0) / 1000))} · '
+            f'{"enabled" if song.get("enabled") else "disabled"}</p>'
+            f'<p>{rename} &nbsp; {toggle} &nbsp; {delete}</p>'
+        )
+        body = (
+            head + _song_audio_block(slug)
+            + '<p style="margin-top:20px"><a href="/admin/songs">← all songs</a></p>'
+        )
+        return render.page(f"Song {song['name']}", body, user=user, csrf=csrf)
+
+    @router.post("/songs/{slug}/rename")
+    def rename_song(
+        slug: str,
+        request: Request,
+        name: str = Form(""),
+        csrf: str = Form(""),
+        _user: str = Depends(auth.admin_required),
+    ):
+        if not auth.check_csrf(request, csrf):
+            raise HTTPException(403, "bad CSRF token")
+        songs.rename(slug, name)
+        return RedirectResponse(f"/admin/songs/{slug}", status_code=303)
+
+    @router.post("/songs/{slug}/enabled")
+    def set_song_enabled(
+        slug: str,
+        request: Request,
+        on: str = Form("1"),
+        csrf: str = Form(""),
+        _user: str = Depends(auth.admin_required),
+    ):
+        if not auth.check_csrf(request, csrf):
+            raise HTTPException(403, "bad CSRF token")
+        songs.set_enabled(slug, on == "1")
+        return RedirectResponse("/admin/songs", status_code=303)
+
+    @router.post("/songs/{slug}/delete")
+    def delete_song(
+        slug: str,
+        request: Request,
+        csrf: str = Form(""),
+        _user: str = Depends(auth.admin_required),
+    ):
+        if not auth.check_csrf(request, csrf):
+            raise HTTPException(403, "bad CSRF token")
+        songs.delete(slug)
+        return RedirectResponse("/admin/songs", status_code=303)
+
+    @router.get("/songs/{slug}/audio/{kind}")
+    def song_audio(
+        slug: str, kind: str, _user: str = Depends(auth.admin_required)
+    ):
+        key = songs.clip_key(slug, kind)
+        if key is None:
+            raise HTTPException(404, "unknown song clip")
+        path = storage.local_path(key)
+        if path is None or not path.is_file():
+            raise HTTPException(404, "clip not found")
+        return FileResponse(
+            path, media_type=media_type_for(key), headers={"Cache-Control": "no-store"}
         )
 
     return router
