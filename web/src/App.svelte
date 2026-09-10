@@ -23,7 +23,8 @@
 <style>
   .brand {
     align-self: center;
-    font-weight: 800;
+    font-family: var(--font-display);
+    font-weight: 700;
     font-size: clamp(1.9rem, 8vw, 2.6rem);
     letter-spacing: 0.28em;
     padding-left: 0.28em; /* balance the trailing letter-spacing */

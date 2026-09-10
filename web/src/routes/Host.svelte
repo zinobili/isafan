@@ -250,7 +250,7 @@
   }
   .alts button.active {
     background: var(--accent);
-    color: #fff;
+    color: var(--accent-ink);
   }
   .note {
     font-size: 0.72rem;

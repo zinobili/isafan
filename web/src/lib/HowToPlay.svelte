@@ -309,10 +309,10 @@
     height: 130px;
     width: auto;
   }
-  .a1 { background: #faeeda; }
-  .a2 { background: #e6f1fb; }
-  .a3 { background: #e1f5ee; }
-  .a4 { background: #fbeaf0; }
+  .a1 { background: #ffe9ef; }
+  .a2 { background: #fff1d8; }
+  .a3 { background: #fdeecb; }
+  .a4 { background: #ffe6ee; }
 
   .htp-cap {
     margin: 10px 0 0;
