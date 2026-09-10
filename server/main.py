@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from . import __version__, audio, media, retention
 from .admin.routes import build_admin_router
+from .clips import media_type_for
 from .config import settings
 from .game import GameRegistry
 from .ratelimit import RateLimiter
@@ -127,6 +128,22 @@ def list_songs() -> list[dict]:
     """Enabled library songs a host / solo player can pick instead of recording
     the original. Public — this is reference material meant to be played."""
     return song_library.enabled_public()
+
+
+@app.get("/api/songs/{slug}/audio/{kind}")
+def song_preview(slug: str, kind: str):
+    """Stream an enabled library song's forward / reversed clip so the picker
+    can preview it before the host commits to using it."""
+    if kind not in ("forward", "reversed"):
+        raise HTTPException(404, "unknown clip")
+    song = song_library.get(slug)
+    if not song or not song.get("enabled"):
+        raise HTTPException(404, "no such song")
+    key = song_library.clip_key(slug, kind)
+    resp = storage.file_response(key, media_type=media_type_for(key))
+    if resp is None:
+        raise HTTPException(404, "clip not found")
+    return resp
 
 
 @app.post("/api/solo")

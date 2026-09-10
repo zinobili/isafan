@@ -38,6 +38,20 @@ def test_list_songs_reports_only_enabled(client, a_song):
     assert client.get("/api/songs").json() == []
 
 
+def test_song_preview_streams_forward_and_reversed(client, a_song):
+    for kind in ("forward", "reversed"):
+        r = client.get(f"/api/songs/test-anthem/audio/{kind}")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "audio/wav"
+        assert r.content[:4] == b"RIFF"
+
+    assert client.get("/api/songs/test-anthem/audio/source").status_code == 404
+    assert client.get("/api/songs/nope/audio/forward").status_code == 404
+
+    song_library.set_enabled("test-anthem", False)
+    assert client.get("/api/songs/test-anthem/audio/forward").status_code == 404
+
+
 def test_solo_picks_library_song_as_original(client, a_song):
     code = client.post("/api/solo").json()["code"]
     r = client.post(f"/api/games/{code}/original/library", data={"slug": "test-anthem"})

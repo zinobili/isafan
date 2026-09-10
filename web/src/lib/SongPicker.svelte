@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, createEventDispatcher } from "svelte";
-  import { listSongs, type LibrarySong } from "./api";
+  import { listSongs, songAudioUrl, type LibrarySong } from "./api";
+  import PlayClip from "./PlayClip.svelte";
 
   /** parent locks the buttons while it processes a pick */
   export let busy = false;
@@ -11,6 +12,8 @@
 
   let songs: LibrarySong[] = [];
   let loaded = false;
+  /** a song the player is auditioning but hasn't committed to yet */
+  let previewing: LibrarySong | null = null;
 
   onMount(async () => {
     try {
@@ -28,24 +31,50 @@
 </script>
 
 {#if loaded && songs.length}
-  <div class="picker">
-    <p class="pk-label">{label}</p>
-    <div class="list">
-      {#each songs as s (s.slug)}
+  {#if previewing}
+    {@const song = previewing}
+    <div class="picker preview">
+      <p class="pk-label">Preview — {song.name}</p>
+      <PlayClip
+        url={songAudioUrl(song.slug, "forward")}
+        label="The song, forwards"
+      />
+      <div class="row">
         <button
-          class="secondary song"
           disabled={busy}
-          on:click={() => dispatch("pick", { slug: s.slug })}
+          on:click={() => dispatch("pick", { slug: song.slug })}
         >
-          <span class="name">{s.name}</span>
-          <span class="meta">
-            {fmt(s.durationMs)}{#if s.lineCount}
-              · {s.lineCount} lines{/if}
-          </span>
+          {busy ? "Setting up…" : "Use this song"}
         </button>
-      {/each}
+        <button
+          class="secondary"
+          disabled={busy}
+          on:click={() => (previewing = null)}
+        >
+          ← Back to recording
+        </button>
+      </div>
     </div>
-  </div>
+  {:else}
+    <div class="picker">
+      <p class="pk-label">{label}</p>
+      <div class="list">
+        {#each songs as s (s.slug)}
+          <button
+            class="secondary song"
+            disabled={busy}
+            on:click={() => (previewing = s)}
+          >
+            <span class="name">{s.name}</span>
+            <span class="meta">
+              {fmt(s.durationMs)}{#if s.lineCount}
+                · {s.lineCount} lines{/if}
+            </span>
+          </button>
+        {/each}
+      </div>
+    </div>
+  {/if}
 {/if}
 
 <style>
@@ -72,5 +101,8 @@
     margin-left: auto;
     font-size: 0.78rem;
     color: var(--muted);
+  }
+  .preview .row {
+    margin-top: 4px;
   }
 </style>

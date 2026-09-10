@@ -35,6 +35,14 @@ export async function listSongs(): Promise<LibrarySong[]> {
   return res.json();
 }
 
+/** URL that streams a library song's clip, for previewing before picking it. */
+export function songAudioUrl(
+  slug: string,
+  kind: "forward" | "reversed" = "forward"
+): string {
+  return `/api/songs/${encodeURIComponent(slug)}/audio/${kind}`;
+}
+
 /** Use a library song as the game's original (server copies its clips in and
  * moves the game to REVERSED_PLAYBACK). `playerId` required in multi-device. */
 export async function pickOriginalFromLibrary(
