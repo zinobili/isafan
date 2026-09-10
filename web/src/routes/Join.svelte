@@ -14,6 +14,7 @@
   import { navigate, path, codeFromPath } from "../lib/router";
   import { uploadAttempt } from "../lib/api";
   import type { Recording } from "../lib/audio";
+  import HowToPlay from "../lib/HowToPlay.svelte";
   import Lobby from "../lib/Lobby.svelte";
   import PlayClip from "../lib/PlayClip.svelte";
   import PrivacyNote from "../lib/PrivacyNote.svelte";
@@ -76,6 +77,8 @@
       <span class="spacer"></span>
       <button class="secondary" on:click={leaveGame}>Leave</button>
     </div>
+
+    <HowToPlay />
 
     {#if $game.phase === "HOST_RECORDING"}
       <p>The host is recording the song…</p>
