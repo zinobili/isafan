@@ -19,6 +19,21 @@ from .storage import Storage
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 MAX_NAME_LEN = 24
 
+# Every stored game lives under this prefix as ``games/<code>/…``.
+GAMES_PREFIX = "games"
+
+
+def read_game_meta(storage: Storage, code: str) -> dict:
+    """Parsed ``games/<code>/game.json`` (the best-effort mirror
+    `GameRegistry.persist` writes), or ``{}`` when it is missing or unreadable.
+    Retention and the admin pages read it to inspect games that have left
+    memory."""
+    try:
+        meta = json.loads(storage.get_text(f"{GAMES_PREFIX}/{code}/game.json"))
+    except Exception:
+        return {}
+    return meta if isinstance(meta, dict) else {}
+
 
 class Phase(str, Enum):
     LOBBY = "LOBBY"
@@ -121,12 +136,17 @@ class Game:
         self.votes[voter_id] = target["id"]
         return True
 
-    def reset_for_new_round(self) -> None:
-        self.round_no += 1
+    def clear_round(self) -> None:
+        """Drop the current round's recording, mimics and votes — but not the
+        round counter or phase (the caller sets those)."""
         self.original = None
         self.attempts = []
         self.votes = {}
         self.reveal_original = False
+
+    def reset_for_new_round(self) -> None:
+        self.round_no += 1
+        self.clear_round()
         self.phase = Phase.HOST_RECORDING
 
     def add_player(self, name: str, as_host: bool = False) -> Player:
@@ -219,7 +239,9 @@ class GameRegistry:
 
     def persist(self, game: Game) -> None:
         try:
-            self._storage.put_text(f"games/{game.code}/game.json", game.to_json())
+            self._storage.put_text(
+                f"{GAMES_PREFIX}/{game.code}/game.json", game.to_json()
+            )
         except Exception:
             # Best-effort in this phase; retention/admin come later.
             pass

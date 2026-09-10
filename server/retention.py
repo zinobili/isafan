@@ -10,13 +10,10 @@ after a move to object storage (see backlog Phase 7).
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 
-from .game import GameRegistry
+from .game import GAMES_PREFIX, GameRegistry, read_game_meta
 from .storage import Storage
-
-_GAMES_PREFIX = "games"
 
 # Wall-clock time the retention loop last finished a sweep; None until the first
 # one runs. The admin status page reads this to show "next purge".
@@ -28,14 +25,13 @@ def _game_age_seconds(storage: Storage, code: str, now: float) -> float | None:
     falls back to the most recent last-modified time across the folder's files.
     Returns None when nothing is readable, so the caller leaves it alone."""
     try:
-        meta = json.loads(storage.get_text(f"{_GAMES_PREFIX}/{code}/game.json"))
-        return max(0.0, now - float(meta["createdAt"]))
-    except Exception:
+        return max(0.0, now - float(read_game_meta(storage, code)["createdAt"]))
+    except (KeyError, TypeError, ValueError):
         pass
     mtimes = [
         m
-        for child in storage.list_children(f"{_GAMES_PREFIX}/{code}")
-        if (m := storage.modified_at(f"{_GAMES_PREFIX}/{code}/{child}")) is not None
+        for child in storage.list_children(f"{GAMES_PREFIX}/{code}")
+        if (m := storage.modified_at(f"{GAMES_PREFIX}/{code}/{child}")) is not None
     ]
     return max(0.0, now - max(mtimes)) if mtimes else None
 
@@ -50,11 +46,11 @@ def purge_expired(
         return []
     now = time.time()
     purged: list[str] = []
-    for code in storage.list_children(_GAMES_PREFIX):
+    for code in storage.list_children(GAMES_PREFIX):
         age = _game_age_seconds(storage, code, now)
         if age is None or age < ttl_seconds:
             continue
-        storage.delete(f"{_GAMES_PREFIX}/{code}")
+        storage.delete(f"{GAMES_PREFIX}/{code}")
         registry.drop(code)
         purged.append(code)
     return purged

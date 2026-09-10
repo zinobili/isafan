@@ -195,10 +195,7 @@ class Hub:
             return
         game.phase = phase
         if clear_round:
-            game.original = None
-            game.attempts = []
-            game.votes = {}
-            game.reveal_original = False
+            game.clear_round()
         self._registry.persist(game)
         await self._broadcast(code)
 

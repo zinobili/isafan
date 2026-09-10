@@ -4,25 +4,18 @@ after a later move to object storage)."""
 
 from __future__ import annotations
 
-import json
 import time
 
 from ..clips import is_allowed_clip_name
+from ..game import GAMES_PREFIX, read_game_meta
 from ..storage import Storage
-
-
-def _read_meta(storage: Storage, code: str) -> dict:
-    try:
-        return json.loads(storage.get_text(f"games/{code}/game.json"))
-    except Exception:
-        return {}
 
 
 def list_games(storage: Storage, ttl_seconds: int) -> list[dict]:
     now = time.time()
     rows: list[dict] = []
-    for code in storage.list_children("games"):
-        meta = _read_meta(storage, code)
+    for code in storage.list_children(GAMES_PREFIX):
+        meta = read_game_meta(storage, code)
         created = meta.get("createdAt")
         rows.append(
             {
@@ -47,9 +40,11 @@ def list_games(storage: Storage, ttl_seconds: int) -> list[dict]:
 def load_game(storage: Storage, code: str) -> dict | None:
     """Metadata + the clip files actually on disk, grouped into original and
     per-attempt. None when nothing is stored under that code."""
-    meta = _read_meta(storage, code)
+    meta = read_game_meta(storage, code)
     present = {
-        n for n in storage.list_children(f"games/{code}") if is_allowed_clip_name(n)
+        n
+        for n in storage.list_children(f"{GAMES_PREFIX}/{code}")
+        if is_allowed_clip_name(n)
     }
     if not meta and not present:
         return None

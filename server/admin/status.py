@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .. import retention
 from ..config import Settings
-from ..game import GameRegistry
+from ..game import GAMES_PREFIX, GameRegistry, read_game_meta
 from ..storage import Storage
 
 
@@ -41,19 +41,18 @@ def collect(
         for g in sorted(registry.all(), key=lambda g: g.created_at)
     ]
 
-    stored_codes = storage.list_children("games")
+    stored_codes = storage.list_children(GAMES_PREFIX)
     clip_count = 0
     clip_bytes = 0
     created_times: list[float] = []
     for code in stored_codes:
-        for name in storage.list_children(f"games/{code}"):
+        for name in storage.list_children(f"{GAMES_PREFIX}/{code}"):
             if _is_clip(name):
                 clip_count += 1
-                clip_bytes += storage.size(f"games/{code}/{name}") or 0
+                clip_bytes += storage.size(f"{GAMES_PREFIX}/{code}/{name}") or 0
         try:
-            meta = json.loads(storage.get_text(f"games/{code}/game.json"))
-            created_times.append(float(meta["createdAt"]))
-        except Exception:
+            created_times.append(float(read_game_meta(storage, code)["createdAt"]))
+        except (KeyError, TypeError, ValueError):
             pass
 
     try:
