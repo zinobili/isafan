@@ -1,5 +1,7 @@
 # isafan — reverse-audio party game
 
+![How to play: someone sings, we flip the audio, copy the gibberish, flip back and vote](docs/screenshot.png)
+
 A Jackbox-style party game built around **reversed audio**: one person sings and
 records, everyone hears it played backwards and tries to mimic *that*, then each
 attempt is reversed again so the group can judge who landed closest.
