@@ -81,9 +81,13 @@ class Game:
     votes: dict[str, str] = field(default_factory=dict)
     # host toggle: also let the audience hear the song the right way round
     reveal_original: bool = False
+    # Unguessable secret baked into every clip URL, so knowing (or guessing) the
+    # short room code isn't enough to download recordings. Only handed out via
+    # game state to people in the game; never written to game.json.
+    media_key: str = field(default_factory=lambda: secrets.token_urlsafe(16))
 
     def audio_url(self, name: str) -> str:
-        return f"/api/games/{self.code}/audio/{name}"
+        return f"/api/games/{self.code}/audio/{self.media_key}/{name}"
 
     def original_public(self) -> dict | None:
         if not self.original:

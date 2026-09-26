@@ -53,7 +53,7 @@ def test_add_and_replace_attempt():
     g.add_attempt(id=eid, name="Nora", source_ext="webm", duration_ms=1200, by="p1")
     pub = g.attempts_public()[0]
     assert pub["id"] == eid and pub["by"] == "p1"
-    assert pub["url"] == f"/api/games/ABCD/audio/attempt_{eid}_reversed.wav"
+    assert pub["url"] == f"/api/games/ABCD/audio/{g.media_key}/attempt_{eid}_reversed.wav"
 
 
 def test_cast_vote_rules():

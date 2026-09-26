@@ -2,7 +2,7 @@
 WebSocket path that normally drives phases is covered in test_ws.py."""
 
 from server.game import Phase
-from server.main import registry
+from server.main import registry, storage
 
 
 def _files(webm: bytes):
@@ -117,7 +117,7 @@ def test_attempt_accepts_video_recorder_upload(client, webm_bytes):
     assert r.status_code == 200
     eid = r.json()["id"]
     assert registry.get(g.code).attempts[0]["sourceExt"] == "mov"
-    assert client.get(f"/api/games/{g.code}/audio/attempt_{eid}_source.mov").status_code == 200
+    assert client.get(g.audio_url(f"attempt_{eid}_source.mov")).status_code == 200
 
 
 def test_attempts_multi_phase_gate_and_replace(client, webm_bytes):
@@ -142,7 +142,7 @@ def test_attempts_multi_phase_gate_and_replace(client, webm_bytes):
     assert r2.status_code == 200 and r2.json()["id"] != first_id
     assert len(registry.get(g.code).attempts) == 1          # replaced, not appended
     # old reversed clip is gone
-    assert client.get(f"/api/games/{g.code}/audio/attempt_{first_id}_reversed.wav").status_code == 404
+    assert client.get(g.audio_url(f"attempt_{first_id}_reversed.wav")).status_code == 404
 
 
 def test_attempts_unknown_player_rejected(client, webm_bytes):
@@ -159,6 +159,21 @@ def test_audio_allowlist_and_traversal(client, webm_bytes):
     g = registry.create("solo")
     client.post(f"/api/games/{g.code}/original", files=_files(webm_bytes), data={"playerId": ""})
 
-    assert client.get(f"/api/games/{g.code}/audio/original_reversed.wav").status_code == 200
+    assert client.get(g.audio_url("original_reversed.wav")).status_code == 200
     for bad in ("game.json", "original_source.exe", "../../etc/passwd", "attempt_x_reversed.mp3"):
-        assert client.get(f"/api/games/{g.code}/audio/{bad}").status_code == 404
+        assert client.get(g.audio_url(bad)).status_code == 404
+
+
+def test_audio_needs_the_games_media_key(client, webm_bytes):
+    """The short room code alone must not unlock a game's recordings."""
+    g = registry.create("solo")
+    client.post(f"/api/games/{g.code}/original", files=_files(webm_bytes), data={"playerId": ""})
+
+    assert client.get(g.audio_url("original_reversed.wav")).status_code == 200
+    base = f"/api/games/{g.code}/audio"
+    assert client.get(f"{base}/original_reversed.wav").status_code == 404        # no key
+    assert client.get(f"{base}/wrong-key/original_reversed.wav").status_code == 404
+    other = registry.create("solo")                                             # another game's key
+    assert client.get(f"{base}/{other.media_key}/original_reversed.wav").status_code == 404
+    # the key never lands in the stored game.json mirror
+    assert g.media_key not in storage.get_text(f"games/{g.code}/game.json")

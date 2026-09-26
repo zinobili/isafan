@@ -65,9 +65,9 @@ def test_solo_picks_library_song_as_original(client, a_song):
     assert game.original["songSlug"] == "test-anthem"
     assert game.original["durationMs"] == a_song["durationMs"]
 
-    clip = client.get(f"/api/games/{code}/audio/original_reversed.wav")
+    clip = client.get(game.audio_url("original_reversed.wav"))
     assert clip.status_code == 200 and clip.content[:4] == b"RIFF"
-    assert client.get(f"/api/games/{code}/audio/original_forward.wav").status_code == 200
+    assert client.get(game.audio_url("original_forward.wav")).status_code == 200
 
 
 def test_multi_pick_is_host_only(client, a_song):

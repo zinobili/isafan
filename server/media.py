@@ -6,7 +6,9 @@ POST /api/games/{code}/original/library pick a library song as the original
                                         instead of recording one.
 POST /api/games/{code}/attempts         one player's mimic; reversed +
                                         transcoded, appended to the attempts.
-GET  /api/games/{code}/audio/{name}     serve a stored clip (allow-listed names).
+GET  /api/games/{code}/audio/{key}/{name}
+                                        serve a stored clip (allow-listed names);
+                                        `key` is the game's secret media key.
 
 In multi-device mode `/original*` is host-only and `/attempts` requires a known
 playerId. Solo mode (one device, pass-the-phone) skips both checks.
@@ -14,6 +16,7 @@ playerId. Solo mode (one device, pass-the-phone) skips both checks.
 
 from __future__ import annotations
 
+import hmac
 import time
 
 from fastapi import APIRouter, Form, HTTPException, UploadFile
@@ -126,12 +129,19 @@ def build_router(
             "url": game.audio_url(f"attempt_{eid}_reversed.wav"),
         }
 
-    @router.get("/audio/{name}")
-    def get_audio(code: str, name: str):
-        if not is_allowed_clip_name(name):
-            raise HTTPException(404, "unknown clip")
+    @router.get("/audio/{key}/{name}")
+    def get_audio(code: str, key: str, name: str):
+        # Same 404 for a wrong key, an unknown game and an unknown clip, so the
+        # response doesn't reveal which room codes are live.
+        game = registry.get(code)
+        if (
+            not game
+            or not hmac.compare_digest(key.encode(), game.media_key.encode())
+            or not is_allowed_clip_name(name)
+        ):
+            raise HTTPException(404, "clip not found")
         resp = storage.file_response(
-            f"games/{code}/{name}", media_type=media_type_for(name)
+            f"games/{game.code}/{name}", media_type=media_type_for(name)
         )
         if resp is None:
             raise HTTPException(404, "clip not found")
