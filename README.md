@@ -205,3 +205,7 @@ web/      Svelte + Vite SPA — routes/, lib/ (socket client, router, components
 data/     runtime only (gitignored): per-game folders + game.json, song library
 Dockerfile, docker-compose.yml   single-instance deploy (see "Deploy")
 ```
+
+## Credits
+
+inspiration: C Wong
