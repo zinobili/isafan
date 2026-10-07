@@ -11,66 +11,9 @@ Architecture, options, and the full roadmap live in the plan doc:
 
 ## SAD
 
-```mermaid
-flowchart TB
-  subgraph Clients["CLIENTS — Svelte + Vite SPA in the browser"]
-    direction LR
-    Host["Host screen<br/><i>/host</i>"]
-    Phone["Player phones<br/><i>/join · /solo</i>"]
-    AdminUI["Admin browser<br/><i>/admin</i>"]
-  end
+![isafan architecture: browser clients, FastAPI server entry points and core services, and storage](docs/sad.svg)
 
-  subgraph Server["SERVER — FastAPI, single process"]
-    direction TB
-    subgraph Edge["Entry points"]
-      direction LR
-      Hub["WebSocket hub<br/><i>ws.py</i>"]
-      REST["REST API<br/><i>main.py · media.py</i>"]
-      AdminR["Admin portal<br/><i>admin/</i>"]
-    end
-    subgraph Core["Core services"]
-      direction LR
-      Registry["Game registry<br/><i>game.py · in-memory</i>"]
-      Ingest["Ingest + audio<br/><i>ingest.py · audio.py · ffmpeg</i>"]
-      Songs["Song library<br/><i>songs.py</i>"]
-      Sweep["Retention sweep<br/><i>retention.py</i>"]
-    end
-  end
-
-  Store[("STORAGE<br/>local disk /data<br/>or S3 / R2 / MinIO")]
-
-  Host <==>|WebSocket| Hub
-  Phone <==>|WebSocket| Hub
-  Host -->|HTTP| REST
-  Phone -->|HTTP| REST
-  AdminUI -->|HTTP| AdminR
-
-  REST -->|broadcast| Hub
-  Hub --> Registry
-  REST --> Registry
-  REST --> Ingest
-  REST --> Songs
-  AdminR --> Songs
-
-  Ingest -.->|read / write| Store
-  Songs -.-> Store
-  AdminR -.-> Store
-  Sweep -.->|purge old games| Store
-
-  classDef client fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#0f172a
-  classDef entry fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#0f172a
-  classDef core fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#0f172a
-  classDef store fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#0f172a
-  class Host,Phone,AdminUI client
-  class Hub,REST,AdminR entry
-  class Registry,Ingest,Songs,Sweep core
-  class Store store
-
-  linkStyle 0,1 stroke:#7c3aed,stroke-width:3px
-  linkStyle 2,3,4 stroke:#2563eb,stroke-width:2px
-  linkStyle 5,6,7,8,9,10 stroke:#6b7280,stroke-width:1.5px
-  linkStyle 11,12,13,14 stroke:#d97706,stroke-width:2px,stroke-dasharray:6 4
-```
+<sub>Source: [`docs/sad.mmd`](docs/sad.mmd) — re-render with `npx @mermaid-js/mermaid-cli -i docs/sad.mmd -o docs/sad.svg -b white`.</sub>
 
 **Legend:** 🟪 thick purple `⇔` = WebSocket (live state) · 🟦 blue `→` = HTTP
 (uploads, downloads, admin pages) · ⬜ grey `→` = in-process call · 🟧 dashed
