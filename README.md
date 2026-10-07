@@ -208,4 +208,4 @@ Dockerfile, docker-compose.yml   single-instance deploy (see "Deploy")
 
 ## Credits
 
-inspiration: C Wong
+Inspiration: C Wong
