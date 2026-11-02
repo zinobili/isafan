@@ -94,6 +94,11 @@ what's **not** built yet. Rough priority order within each section.
       of need (would want Redis pub/sub for the hub + a shared/synced registry,
       or sticky routing by room code).
 
+### Phase 8 — Render free-tier deploy — IN PROGRESS
+
+- [ ] Work queue, roles, and away-mode rules live in
+      [docs/deploy-render.md](docs/deploy-render.md). Tick items there, not here.
+
 ### Known gaps / smaller polish
 
 - [ ] **Real-device recording check over HTTPS** — the in-page `MediaRecorder`

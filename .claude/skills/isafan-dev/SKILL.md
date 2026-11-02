@@ -13,6 +13,13 @@ Goal: stop re-running the whole test suite and re-doing full browser checks for
 small changes. Scope the work to what actually changed; do the full pass once,
 right before pushing.
 
+## Current work queue
+
+The Render deploy round is tracked in `docs/deploy-render.md`: ordered items,
+who does what, and the away-mode rules (work on `dev`, never push `main`
+without an OK, park human questions and move on). Read it before picking up
+work.
+
 ## Run the app
 
 One dev server, defined in `.claude/launch.json`. Start it with `preview_start`
