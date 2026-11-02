@@ -50,7 +50,7 @@ iterating, and run the full `pytest` before any push.
 - **Done when:** tests cover the port precedence and `RENDER_EXTERNAL_URL`;
   full `pytest` passes (config is cross-cutting).
 
-### 2. [x] Real client IP behind proxies (a9698df; review pending)
+### 2. [x] Real client IP behind proxies (a9698df; review fixes 18c43c1)
 - **Needs:** 1.
 - Add `client_ip(headers, peer_host, trusted_hops)` to `server/net.py`. With
   `trusted_hops = N > 0`, walk `X-Forwarded-For` from the right and trust
@@ -69,7 +69,7 @@ iterating, and run the full `pytest` before any push.
 - Live hop count gets confirmed in item 8. Don't guess it from FI1M (that one
   had Cloudflare in front, while plain `onrender.com` may differ).
 
-### 3. [x] Harden the static handler and add cache headers (04228fe; review pending)
+### 3. [x] Harden the static handler and add cache headers (04228fe; review fixes in log)
 - **Needs:** 1. (Can follow 2 directly.)
 - In `server/main.py` `spa()`:
   - Decode once. Refuse null bytes, `\`, `:`, `//`, and any segment starting
@@ -89,7 +89,7 @@ iterating, and run the full `pytest` before any push.
   `/foo.png`, the three cache headers, and an `/api/nope` JSON 404. Add the new
   file to the `isafan-dev` skill's test map.
 
-### 4. [x] Graceful shutdown of WebSockets (see log)
+### 4. [x] Graceful shutdown of WebSockets (93c7b67)
 - **Needs:** 1. Touches `server/ws.py`, so not in parallel with 2.
 - On lifespan shutdown (SIGTERM on every deploy and sleep), the `Hub` closes
   every open socket with code `1012` (service restart) before the retention
@@ -145,6 +145,10 @@ iterating, and run the full `pytest` before any push.
   "Your IP as seen: X · raw X-Forwarded-For: Y", behind admin login (never
   public). The human compares it with their real IP and picks
   `ISAFAN_TRUST_PROXY`. Remove the line afterwards in its own commit.
+- Also check (from the item 2 review): send a request with your own extra
+  `X-Forwarded-For: 6.6.6.6` header line and confirm Render's appended entry
+  ends up **right-most** in the raw value. If Render puts its line first,
+  `client_ip` must stop joining multiple header lines.
 - Human part: H3 and H4.
 
 ## Waiting on the human
@@ -162,6 +166,15 @@ the default you'll assume if the change is reversible.
 - **H3. [ ] Pick the trust-proxy hop count** from the item 8 status line, set
   `ISAFAN_TRUST_PROXY` in the dashboard, and confirm two phones on different
   networks get different IPs.
+  - *From the item 2 security review (2026-11-02):* set N to the **shortest
+    real path**. If Cloudflare is ever put in front while the `onrender.com`
+    URL stays reachable, N=2 lets anyone hitting `onrender.com` directly
+    spoof their IP (and lock a chosen victim out of admin login). Then
+    either keep N=1 or add a secret-header check first.
+  - Until H3 is done, `ISAFAN_TRUST_PROXY=0` on Render means every visitor
+    shares the proxy's IP: 10 game creates a minute site-wide, and 5 bad
+    admin logins lock the admin out for everyone for 15 min. Fine for a
+    friends-only soft launch; do H3 soon after the first deploy.
 - **H4. [ ] Real-phone test over HTTPS:** in-page recording on Android Chrome
   and iPhone Safari, one full multi-device round, and admin login.
 - **H5. [ ] Release OKs.** Every fast-forward of `main` needs a yes in chat.
@@ -218,4 +231,6 @@ Newest last. One line per event: date · item · what happened · commit.
 - 2026-11-02 · 3 · handler moved to new `server/spa.py` (`mount_spa`, called last in `main.py`) so tests can mount it over a fake dist; guards also refuse a leading `/` (URL `//etc/passwd`); GET + HEAD; `test_static.py` added (symlink case skips on Windows without symlink rights). · 04228fe
 - 2026-11-02 · 3 · security-reviewer subagent started on 04228fe.
 - 2026-11-02 · 2 · review back: 1 high (rate-limiter `_gc` goes quadratic with many keys), IPv6 /128 keys, uvicorn `proxy_headers` on by default, plus notes for H3/item 8. Fixes follow item 4.
-- 2026-11-02 · 4 · `Hub.close_all()` (1012) tracks every accepted socket and runs first on lifespan shutdown; `socket.ts` already reconnects on any close it didn't start, so no web change; 2 tests in `test_ws.py`; full pytest 173 passed. · this commit
+- 2026-11-02 · 4 · `Hub.close_all()` (1012) tracks every accepted socket and runs first on lifespan shutdown; `socket.ts` already reconnects on any close it didn't start, so no web change; 2 tests in `test_ws.py`; full pytest 173 passed. · 93c7b67
+- 2026-11-02 · 2 · review fixes: limiter GC amortised + LRU cap (was quadratic: 21 s for 20k keys), IPv6 keyed by /64, zone ids / v4-mapped normalised, uvicorn `proxy_headers=False`. Not fixed (out of scope, low): the admin login throttle also charges successful logins. Config notes added to H3 / item 8. · 18c43c1
+- 2026-11-02 · 3 · review back: no traversal on Linux. Fixed: exact-spelling realpath check (Windows 8.3 `ENV~1` -> `.env` leak on dev boxes, case/trailing-dot aliases), ENAMETOOLONG/EACCES now 404 not 500, resolved `index`, `/api` + HEAD never fall through to the SPA. Symlink test still only runs where symlinks are allowed. · this commit

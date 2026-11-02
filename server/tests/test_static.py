@@ -151,3 +151,38 @@ def test_api_miss_is_json_404(client):
     r = client.get("/api/nope")
     assert r.status_code == 404
     assert r.json() == {"detail": "not found"}
+
+
+def test_short_names_case_aliases_and_trailing_dots_are_refused(web, dist):
+    (dist / ".secretdir").mkdir()
+    (dist / ".secretdir" / "key.txt").write_text("SECRET=2")
+    for path in ("/ENV~1", "/SECRET~1/key.txt", "/ASSETS/app-abc123.js",
+                 "/index.html.", "/assets/app-abc123.js.", "/Favicon.svg"):
+        r = _raw_get(web, path)
+        assert "SECRET" not in r.text, path
+        assert r.headers.get("cache-control") != spa.ASSET_CACHE, path
+
+
+def test_overlong_name_is_404_not_500(web):
+    r = web.get("/" + "a" * 300 + ".js")
+    assert r.status_code == 404
+    r = web.get("/" + "a" * 300)
+    assert r.status_code == 200 and r.text == INDEX
+
+
+def test_404_has_no_cache_header(web):
+    r = web.get("/assets/x.js")
+    assert r.status_code == 404 and "cache-control" not in r.headers
+
+
+def test_api_paths_never_get_the_spa(web):
+    for path in ("/api", "/api/whatever", "/api/x.js"):
+        r = web.get(path)
+        assert r.status_code == 404 and INDEX not in r.text, path
+
+
+def test_head_on_api_routes_is_not_the_spa(client):
+    for path in ("/api/nope", "/api/health"):
+        r = client.head(path)
+        assert r.status_code in (404, 405), (path, r.status_code)
+        assert "no-cache" not in r.headers.get("cache-control", ""), path

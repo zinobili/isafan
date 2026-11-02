@@ -169,7 +169,7 @@ app.include_router(media.build_router(registry, storage, hub, song_library))
 app.include_router(build_admin_router(registry, storage, song_library))
 
 
-@app.api_route("/api/{_rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+@app.api_route("/api/{_rest:path}", methods=["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH"])
 def api_not_found(_rest: str):
     """Anything under /api that no route above matched is a real 404 — don't let
     it fall through to the SPA fallback and return index.html."""

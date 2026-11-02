@@ -44,14 +44,19 @@ def _file_like(rel: str) -> bool:
 
 
 def _inside(root: Path, rel: str) -> Path | None:
-    """The real path of `rel` if it is a regular file within `root`."""
+    """The real path of `rel` if it is a regular file within `root` that is
+    spelled exactly `rel` once resolved. The exact-spelling check gives each
+    file one URL: it refuses Windows 8.3 short names (`ENV~1` -> `.env`),
+    case aliases, trailing dots/spaces, and symlinks into dot-directories."""
     try:
         real = (root / rel).resolve()
-    except (OSError, RuntimeError, ValueError):  # symlink loops, odd names
+        if real == root or root not in real.parents:
+            return None
+        if real.relative_to(root).as_posix() != rel:
+            return None
+        return real if real.is_file() else None
+    except (OSError, RuntimeError, ValueError):  # loops, ENAMETOOLONG, EACCES
         return None
-    if real == root or root not in real.parents:
-        return None
-    return real if real.is_file() else None
 
 
 def _not_found() -> Response:
@@ -62,7 +67,7 @@ def mount_spa(app: FastAPI, static_dir: Path) -> bool:
     """Register the catch-all static route if `static_dir/index.html` exists.
     Must be called after every other route. Returns whether it mounted."""
     root = static_dir.resolve()
-    index = root / "index.html"
+    index = (root / "index.html").resolve()
     if not index.is_file():
         return False
 
@@ -72,7 +77,9 @@ def mount_spa(app: FastAPI, static_dir: Path) -> bool:
     @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     def spa(full_path: str) -> Response:
         rel = full_path
-        if _refused(rel):
+        # /api is the JSON API's space: never answer it with the SPA (e.g. a
+        # HEAD to a GET-only API route would otherwise land here).
+        if _refused(rel) or rel == "api" or rel.startswith("api/"):
             return _not_found()
         if rel:
             found = _inside(root, rel)
