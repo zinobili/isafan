@@ -36,7 +36,7 @@ Do them **in order, one at a time, on `dev`**. Items 1–4 touch overlapping fil
 commit per item. Test with the `isafan-dev` skill's file→test map while
 iterating, and run the full `pytest` before any push.
 
-### 1. [ ] Port and join link
+### 1. [x] Port and join link (d91005e)
 - **Needs:** nothing.
 - `server/config.py`: port = `ISAFAN_PORT`, else `PORT`, else 8000.
 - `Dockerfile`: drop `ISAFAN_PORT=8000` from `ENV` so Render's `PORT` wins.
@@ -50,7 +50,7 @@ iterating, and run the full `pytest` before any push.
 - **Done when:** tests cover the port precedence and `RENDER_EXTERNAL_URL`;
   full `pytest` passes (config is cross-cutting).
 
-### 2. [ ] Real client IP behind proxies
+### 2. [x] Real client IP behind proxies (see log)
 - **Needs:** 1.
 - Add `client_ip(headers, peer_host, trusted_hops)` to `server/net.py`. With
   `trusted_hops = N > 0`, walk `X-Forwarded-For` from the right and trust
@@ -211,3 +211,6 @@ The session must be in **auto mode**, or permission prompts will stop the work.
 Newest last. One line per event: date · item · what happened · commit.
 
 - 2026-11-02 · — · checklist written.
+- 2026-11-02 · setup · `dev` branched from `main`; checklist committed. Human chose: lead writes items 1–4 itself (no implementer subagent), read-only security-reviewer subagent after 2 and 3; away mode on. · 4f8de6a
+- 2026-11-02 · 1 · `PORT` fallback + `RENDER_EXTERNAL_URL` join link, Dockerfile node:22 and no pinned port, new `test_config.py`; full pytest 129 passed. · d91005e
+- 2026-11-02 · 2 · `net.client_ip` / `connection_ip`, `ISAFAN_TRUST_PROXY` (default 0) wired into main, admin auth and the WS `Hub`; tests in `test_net.py` + `test_ratelimit.py`; full pytest 143 passed. · this commit

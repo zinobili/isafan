@@ -71,3 +71,57 @@ def lan_ips() -> list[str]:
             found.append(ip)
     found.sort(key=lambda ip: (_rank(ip), 0 if ip == primary else 1))
     return found
+
+
+# --- client address behind reverse proxies ----------------------------------
+
+def _parse_ip(entry: str) -> str | None:
+    """Canonical form of one X-Forwarded-For entry, or None if it isn't an IP.
+    Tolerates `1.2.3.4:5678` and `[::1]:5678` port suffixes."""
+    s = entry.strip()
+    if s.startswith("["):
+        end = s.find("]")
+        if end == -1:
+            return None
+        s = s[1:end]
+    elif s.count(":") == 1:  # IPv4 with a port; bare IPv6 has 2+ colons
+        s = s.split(":", 1)[0]
+    try:
+        return str(ipaddress.ip_address(s))
+    except ValueError:
+        return None
+
+
+def client_ip(headers, peer_host: str | None, trusted_hops: int) -> str:
+    """The client's address as seen through `trusted_hops` reverse proxies.
+
+    Each proxy appends the address it received the request from to
+    X-Forwarded-For, so with N proxies in front of us the right-most N entries
+    were written by them and everything further left is client-supplied (and
+    spoofable). We walk from the right and trust exactly N entries — the same
+    idea as Express's `trustProxy: (_addr, hop) => hop < N`. A header shorter
+    than N yields its left-most entry; a malformed entry stops the walk at the
+    last good address. With 0 hops the TCP peer is returned (no proxy).
+    """
+    addr = peer_host or "?"
+    if trusted_hops <= 0:
+        return addr
+    if hasattr(headers, "getlist"):
+        raw = ",".join(headers.getlist("x-forwarded-for"))
+    else:
+        raw = headers.get("x-forwarded-for", "") or ""
+    entries = [e for e in raw.split(",") if e.strip()]
+    for hop, entry in enumerate(reversed(entries)):
+        if hop >= trusted_hops:
+            break
+        ip = _parse_ip(entry)
+        if ip is None:
+            break
+        addr = ip
+    return addr
+
+
+def connection_ip(conn, trusted_hops: int) -> str:
+    """`client_ip` for a Starlette Request or WebSocket."""
+    peer = conn.client.host if conn.client else None
+    return client_ip(conn.headers, peer, trusted_hops)

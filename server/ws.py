@@ -30,6 +30,7 @@ import json
 from fastapi import WebSocket, WebSocketDisconnect
 
 from .game import GameRegistry, Phase
+from .net import connection_ip
 from .ratelimit import RateLimiter
 
 
@@ -38,9 +39,15 @@ _JOINABLE_PHASES = {Phase.LOBBY, Phase.HOST_RECORDING, Phase.REVERSED_PLAYBACK}
 
 
 class Hub:
-    def __init__(self, registry: GameRegistry, create_limiter: RateLimiter | None = None) -> None:
+    def __init__(
+        self,
+        registry: GameRegistry,
+        create_limiter: RateLimiter | None = None,
+        trust_proxy: int = 0,
+    ) -> None:
         self._registry = registry
         self._create_limiter = create_limiter or RateLimiter(0, 0)
+        self._trust_proxy = trust_proxy  # X-Forwarded-For hops to trust for the client IP
         # code -> { player_id -> WebSocket }
         self._conns: dict[str, dict[str, WebSocket]] = {}
 
@@ -125,7 +132,7 @@ class Hub:
     # ------------------------------------------------------------------ verbs
 
     async def _create(self, ws, msg, cur_code, cur_pid):
-        ip = ws.client.host if ws.client else "?"
+        ip = connection_ip(ws, self._trust_proxy)
         if not self._create_limiter.allow(ip):
             await self._err(ws, "rate_limited", "too many games created — wait a moment and retry")
             return cur_code, cur_pid

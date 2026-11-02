@@ -37,6 +37,7 @@ class Settings:
     purge_interval_seconds: int   # how often the retention sweep runs (0 = off)
     create_rate: int              # game-create burst allowed per client IP (0 = off)
     create_rate_window: int       # seconds for that burst to refill
+    trust_proxy: int              # reverse-proxy hops to trust in X-Forwarded-For (0 = none)
     ffmpeg_path: str              # override; "" = bundled (imageio-ffmpeg) or PATH
     audio_sample_rate: int        # canonical WAV sample rate
     max_clip_seconds: int         # reject in-game recordings longer than this
@@ -111,6 +112,7 @@ def load_settings() -> Settings:
         purge_interval_seconds=_int("ISAFAN_PURGE_INTERVAL", 60 * 60),
         create_rate=_int("ISAFAN_CREATE_RATE", 10),
         create_rate_window=_int("ISAFAN_CREATE_RATE_WINDOW", 60),
+        trust_proxy=max(0, _int("ISAFAN_TRUST_PROXY", 0)),
         ffmpeg_path=os.environ.get("ISAFAN_FFMPEG", "").strip(),
         audio_sample_rate=_int("ISAFAN_AUDIO_SR", 16_000),
         max_clip_seconds=_int("ISAFAN_MAX_CLIP_SECONDS", 45),

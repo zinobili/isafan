@@ -52,3 +52,39 @@ def test_ws_create_rate_limited(client, monkeypatch):
             "code": "rate_limited",
             "message": "too many games created — wait a moment and retry",
         }
+
+
+def test_solo_limit_keys_on_forwarded_ip_when_proxy_trusted(client, monkeypatch):
+    import dataclasses
+
+    import server.main as main
+
+    monkeypatch.setattr(main, "settings", dataclasses.replace(main.settings, trust_proxy=1))
+    monkeypatch.setattr(main, "create_limiter", RateLimiter(1, 60))
+    a = {"X-Forwarded-For": "203.0.113.1"}
+    b = {"X-Forwarded-For": "203.0.113.2"}
+    assert client.post("/api/solo", headers=a).status_code == 200
+    assert client.post("/api/solo", headers=a).status_code == 429
+    # same TCP peer, different forwarded client -> its own bucket
+    assert client.post("/api/solo", headers=b).status_code == 200
+    # a spoofed left-most entry doesn't buy a fresh bucket
+    spoof = {"X-Forwarded-For": "198.51.100.9, 203.0.113.1"}
+    assert client.post("/api/solo", headers=spoof).status_code == 429
+
+
+def test_solo_limit_ignores_forwarded_header_by_default(client, monkeypatch):
+    monkeypatch.setattr("server.main.create_limiter", RateLimiter(1, 60))
+    assert client.post("/api/solo", headers={"X-Forwarded-For": "203.0.113.1"}).status_code == 200
+    assert client.post("/api/solo", headers={"X-Forwarded-For": "203.0.113.2"}).status_code == 429
+
+
+def test_ws_create_limit_keys_on_forwarded_ip_when_proxy_trusted(client, monkeypatch):
+    monkeypatch.setattr(hub, "_create_limiter", RateLimiter(1, 60))
+    monkeypatch.setattr(hub, "_trust_proxy", 1)
+    for ip in ("203.0.113.1", "203.0.113.2"):
+        with client.websocket_connect("/ws", headers={"X-Forwarded-For": ip}) as ws:
+            ws.send_json({"type": "create", "name": "A", "mode": "solo"})
+            assert ws.receive_json()["type"] == "joined"
+    with client.websocket_connect("/ws", headers={"X-Forwarded-For": "203.0.113.1"}) as ws:
+        ws.send_json({"type": "create", "name": "A", "mode": "solo"})
+        assert ws.receive_json()["code"] == "rate_limited"

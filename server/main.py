@@ -17,6 +17,7 @@ from .admin.routes import build_admin_router
 from .clips import media_type_for
 from .config import settings
 from .game import GameRegistry
+from .net import connection_ip
 from .ratelimit import RateLimiter
 from .songs import SongLibrary
 from .storage import build_storage
@@ -26,11 +27,11 @@ storage = build_storage(settings.storage_backend, settings.data_dir)
 registry = GameRegistry(storage, settings.game_code_length, settings.max_players)
 song_library = SongLibrary(storage)
 create_limiter = RateLimiter(settings.create_rate, settings.create_rate_window)
-hub = Hub(registry, create_limiter)
+hub = Hub(registry, create_limiter, settings.trust_proxy)
 
 
 def _client_ip(request: Request) -> str:
-    return request.client.host if request.client else "?"
+    return connection_ip(request, settings.trust_proxy)
 
 
 @contextlib.asynccontextmanager

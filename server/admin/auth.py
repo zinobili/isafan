@@ -15,6 +15,7 @@ import time
 from fastapi import HTTPException, Request, Response
 
 from ..config import settings
+from ..net import connection_ip
 from ..ratelimit import RateLimiter
 from .passwords import verify_password
 
@@ -30,7 +31,7 @@ def is_configured() -> bool:
 
 
 def client_ip(request: Request) -> str:
-    return request.client.host if request.client else "?"
+    return connection_ip(request, settings.trust_proxy)
 
 
 # --- credentials ------------------------------------------------------------
