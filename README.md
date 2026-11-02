@@ -32,7 +32,7 @@ orange `⇢` = storage read / write.
 - **Safety:** per-game secret key on clip URLs, rate-limited game creation,
   upload caps, a TTL purge sweep, and an opt-in password-protected admin portal.
 
-## Status — Phase 7 (online hosting)
+## Status — Phase 8 (Render deploy, in progress)
 
 Done:
 
@@ -82,6 +82,12 @@ Done:
   live in object storage instead of the volume. Runs as a **single instance**
   (see "Deploy" — the WebSocket hub and game registry are in-process); TLS is
   terminated by the platform or a proxy in front.
+- **Phase 8 (in progress)**: Render free-tier deploy (see "Deploy (Render)"
+  and `docs/deploy-render.md`). The app listens on `$PORT`, builds the join
+  link from `RENDER_EXTERNAL_URL`, and takes the client IP from
+  `X-Forwarded-For` behind `ISAFAN_TRUST_PROXY` hops. It also hardens static
+  serving and sets cache headers, and closes sockets cleanly with 1012 on
+  shutdown. Still waiting on the service itself and a live check.
 
 Not yet: `relay` mode (split a library song into per-player lines — design
 settled in `backlog.md`, not built).
@@ -158,6 +164,59 @@ The image bundles ffmpeg, so there is nothing else to install.
   Horizontal scale would need a shared pub/sub + registry (e.g. Redis) and is
   deliberately out of scope until the load calls for it — one small container
   comfortably handles a party.
+- **Behind a proxy**, set `ISAFAN_TRUST_PROXY` to the number of proxy hops in
+  front of the app, so rate limits and the admin login throttle see the real
+  client IP from `X-Forwarded-For`. `0` (the default) uses the TCP peer.
+
+## Deploy (Render)
+
+**Live:** _URL added once the service exists (checklist H2)._
+
+isafan runs as **one free Render web service** that serves the SPA, the API
+and the WebSocket from one origin, built from the `Dockerfile`. The service
+was **created by hand in the dashboard** (New → Web Service → Docker), not as
+a Blueprint. Render does **not** read [`render.yaml`](render.yaml). That file
+records the dashboard settings, and **the two must be kept in step by hand**:
+change one, change the other.
+
+| Setting | Value |
+|---|---|
+| Runtime / plan | Docker / Free |
+| Branch | `main`, auto-deploy on |
+| Health check | `/api/health` |
+| Port / join link | from Render's `PORT` and `RENDER_EXTERNAL_URL` (nothing to set) |
+
+**Env vars** (full list in `render.yaml`):
+
+- **Plain values:**
+  - `ISAFAN_STORAGE=s3`
+  - `ISAFAN_S3_REGION=auto`
+  - `ISAFAN_DATA_DIR=/data`
+  - `ISAFAN_TRUST_PROXY`: the proxy hop count, measured after the first
+    deploy.
+- **Secrets**, entered **only in the dashboard** and never in the repo or
+  chat:
+  - `ISAFAN_S3_BUCKET`, `ISAFAN_S3_ENDPOINT`, `ISAFAN_S3_ACCESS_KEY`,
+    `ISAFAN_S3_SECRET_KEY` (a Cloudflare R2 bucket and an API token with
+    read/write on it)
+  - `ISAFAN_ADMIN_USER`, `ISAFAN_ADMIN_PASSWORD_HASH` (from
+    `python -m server.admin.hashpw`), `ISAFAN_ADMIN_SECRET`
+
+**Release flow:**
+
+1. Work lands on `dev`.
+2. `main` moves only by a fast-forward from `dev`, after an explicit OK.
+3. Each push to `main` auto-deploys.
+
+**Free-tier limits:**
+
+- The service sleeps after about 15 minutes without traffic. The next visit
+  waits through a cold start of about 1 minute.
+- Live rooms are in memory and are **lost on sleep or deploy**. Open sockets
+  get a clean `1012` close, and clients reconnect.
+- Stored audio and the song library live in R2, so they survive. The local
+  disk is wiped every time.
+- One instance only, as in the Docker section.
 
 ## Play from a phone (same Wi-Fi)
 
