@@ -8,9 +8,16 @@ process; revisit alongside a shared store (see backlog Phase 7).
 from __future__ import annotations
 
 import time
+from collections import OrderedDict
+
+from .net import rate_key
 
 # Once distinct-IP buckets pass this, drop the ones that have fully refilled.
+# The next sweep waits until the table doubles again, so the cost stays O(1)
+# per request on average even when an attacker rotates keys.
 _GC_THRESHOLD = 4096
+# Hard cap on the table: past it the least-recently-used bucket is evicted.
+_MAX_BUCKETS = 16384
 
 
 class _Bucket:
@@ -30,7 +37,8 @@ class RateLimiter:
         self.refill_per_second = (
             self.capacity / per_seconds if capacity > 0 and per_seconds > 0 else 0.0
         )
-        self._buckets: dict[str, _Bucket] = {}
+        self._buckets: OrderedDict[str, _Bucket] = OrderedDict()
+        self._next_gc = _GC_THRESHOLD
 
     @property
     def enabled(self) -> bool:
@@ -39,13 +47,18 @@ class RateLimiter:
     def allow(self, key: str, cost: float = 1.0) -> bool:
         if not self.enabled:
             return True
+        key = rate_key(key)
         now = time.monotonic()
         b = self._buckets.get(key)
         if b is None:
-            if len(self._buckets) >= _GC_THRESHOLD:
+            if len(self._buckets) >= self._next_gc:
                 self._gc(now)
+                self._next_gc = max(_GC_THRESHOLD, 2 * len(self._buckets))
+            while len(self._buckets) >= _MAX_BUCKETS:
+                self._buckets.popitem(last=False)
             b = self._buckets[key] = _Bucket(self.capacity)
         else:
+            self._buckets.move_to_end(key)
             b.tokens = min(
                 self.capacity, b.tokens + (now - b.last) * self.refill_per_second
             )

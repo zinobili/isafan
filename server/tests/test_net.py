@@ -93,3 +93,28 @@ def test_ports_and_ipv6_are_normalised():
 
 def test_plain_mapping_headers_work():
     assert net.client_ip({"x-forwarded-for": "203.0.113.7"}, PEER, 1) == "203.0.113.7"
+
+
+def test_zone_ids_and_ipv4_mapped_are_normalised():
+    assert net.client_ip(_xff("fe80::1%evil1"), PEER, 1) == "fe80::1"
+    assert net.client_ip(_xff("[fe80::1%x]:1"), PEER, 1) == "fe80::1"
+    assert net.client_ip(_xff("::ffff:203.0.113.7"), PEER, 1) == "203.0.113.7"
+
+
+def test_rate_key_groups_ipv6_by_64():
+    assert net.rate_key("2001:db8:1:2::1") == net.rate_key("2001:db8:1:2:ffff::9")
+    assert net.rate_key("2001:db8:1:2::1") == "2001:db8:1:2::/64"
+    assert net.rate_key("2001:db8:1:3::1") != net.rate_key("2001:db8:1:2::1")
+    assert net.rate_key("203.0.113.7") == "203.0.113.7"
+    assert net.rate_key("?") == "?"
+
+
+def test_uvicorn_proxy_headers_are_off(monkeypatch):
+    import runpy
+
+    import uvicorn
+
+    seen = {}
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **kw: seen.update(kw))
+    runpy.run_module("server", run_name="__main__")
+    assert seen["proxy_headers"] is False

@@ -87,9 +87,29 @@ def _parse_ip(entry: str) -> str | None:
     elif s.count(":") == 1:  # IPv4 with a port; bare IPv6 has 2+ colons
         s = s.split(":", 1)[0]
     try:
-        return str(ipaddress.ip_address(s))
+        addr = ipaddress.ip_address(s)
     except ValueError:
         return None
+    if isinstance(addr, ipaddress.IPv6Address):
+        if addr.scope_id is not None:  # "fe80::1%eth0": drop the zone id
+            addr = ipaddress.IPv6Address(str(addr).split("%", 1)[0])
+        if addr.ipv4_mapped is not None:  # "::ffff:1.2.3.4" is 1.2.3.4
+            addr = addr.ipv4_mapped
+    return str(addr)
+
+
+def rate_key(ip: str) -> str:
+    """Bucket key for a client address: IPv6 clients are grouped by /64 (one
+    home or phone usually owns a whole /64, so per-/128 keys would hand a
+    single client 2^64 fresh rate-limit buckets). Anything that isn't an IP
+    is returned unchanged."""
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return ip
+    if isinstance(addr, ipaddress.IPv6Address):
+        return str(ipaddress.ip_network(f"{addr}/64", strict=False))
+    return str(addr)
 
 
 def client_ip(headers, peer_host: str | None, trusted_hops: int) -> str:

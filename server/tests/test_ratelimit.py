@@ -88,3 +88,38 @@ def test_ws_create_limit_keys_on_forwarded_ip_when_proxy_trusted(client, monkeyp
     with client.websocket_connect("/ws", headers={"X-Forwarded-For": "203.0.113.1"}) as ws:
         ws.send_json({"type": "create", "name": "A", "mode": "solo"})
         assert ws.receive_json()["code"] == "rate_limited"
+
+
+def test_ipv6_clients_share_a_bucket_per_64():
+    rl = RateLimiter(1, 60)
+    assert rl.allow("2001:db8:1:2::1") is True
+    assert rl.allow("2001:db8:1:2::abcd") is False
+    assert rl.allow("2001:db8:1:3::1") is True
+
+
+def test_many_keys_stay_bounded_and_fast(monkeypatch):
+    import time as _time
+
+    from server import ratelimit
+
+    monkeypatch.setattr(ratelimit, "_GC_THRESHOLD", 64)
+    monkeypatch.setattr(ratelimit, "_MAX_BUCKETS", 256)
+    rl = RateLimiter(5, 900)  # login-style: slow refill, so GC frees nothing
+    rl._next_gc = 64
+    start = _time.perf_counter()
+    for i in range(20_000):
+        rl.allow(f"198.51.{i // 256}.{i % 256}")
+    assert len(rl._buckets) <= 256
+    assert _time.perf_counter() - start < 2.0
+
+
+def test_lru_eviction_keeps_recently_used_buckets(monkeypatch):
+    from server import ratelimit
+
+    monkeypatch.setattr(ratelimit, "_MAX_BUCKETS", 3)
+    rl = RateLimiter(1, 60)
+    for k in ("a", "b", "c"):
+        rl.allow(k)
+    rl.allow("a")          # touch a -> b is now oldest
+    rl.allow("d")          # evicts b
+    assert "b" not in rl._buckets and "a" in rl._buckets

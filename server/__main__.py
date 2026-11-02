@@ -15,5 +15,9 @@ if __name__ == "__main__":
         host=settings.host,
         port=settings.port,
         reload=False,
+        # The client IP comes from X-Forwarded-For via ISAFAN_TRUST_PROXY
+        # (server/net.py). uvicorn's own proxy handling would rewrite the peer
+        # address first and break "0 hops = TCP peer", so keep it off.
+        proxy_headers=False,
         **tls,
     )
