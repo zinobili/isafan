@@ -56,7 +56,7 @@ While iterating, run **only** the file(s) mapped to what changed. Run the full
 | `server/admin/games.py` | `pytest server/tests/test_admin_games.py` |
 | `server/admin/auth.py`, `admin/passwords.py`, `admin/hashpw.py` | `pytest server/tests/test_admin.py` |
 | `server/admin/render.py`, `admin/routes.py` | `pytest server/tests/test_admin.py server/tests/test_admin_games.py server/tests/test_admin_delete.py server/tests/test_status.py` |
-| `server/config.py`, `server/main.py` | full `pytest` (cross-cutting — no shortcut) |
+| `server/config.py`, `server/main.py` | full `pytest` (cross-cutting — no shortcut; `test_config.py` covers port + join-link precedence) |
 
 Change spans several rows → run the union. Genuinely unsure → the module's own
 `test_<name>.py` plus any row above that names it. A new test file → run it plus

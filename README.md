@@ -214,8 +214,9 @@ data dir (no `./data` writes).
 ## Configuration
 
 All optional — see `.env.example`. Read at startup from the environment or a
-local `.env` file. Notable: `ISAFAN_PUBLIC_URL` (join-link / QR base address),
-`ISAFAN_PORT`, `ISAFAN_MAX_PLAYERS`, `ISAFAN_DATA_DIR`, `ISAFAN_STORAGE`
+local `.env` file. Notable: `ISAFAN_PUBLIC_URL` (join-link / QR base address;
+falls back to `RENDER_EXTERNAL_URL` on Render, then the detected LAN IP),
+`ISAFAN_PORT` (falls back to `PORT`, then 8000), `ISAFAN_MAX_PLAYERS`, `ISAFAN_DATA_DIR`, `ISAFAN_STORAGE`
 (`local` | `s3`), and the `ISAFAN_ADMIN_*` / `ISAFAN_S3_*` groups.
 
 ## Layout

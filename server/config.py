@@ -22,10 +22,11 @@ class Settings:
     host: str
     port: int
     public_url: str               # join-link / QR base. Explicit ISAFAN_PUBLIC_URL,
-                                  # else an auto-detected LAN address, else "" (use
-                                  # the origin the host screen was opened with).
+                                  # else Render's RENDER_EXTERNAL_URL, else an
+                                  # auto-detected LAN address, else "" (use the
+                                  # origin the host screen was opened with).
     public_url_candidates: tuple[str, ...]  # all reachable bases, best guess first
-    public_url_source: str        # "config" | "detected" | "origin"
+    public_url_source: str        # "config" | "render" | "detected" | "origin"
     data_dir: Path
     storage_backend: str          # "local" now; "s3" added in a later phase
     game_code_length: int
@@ -67,12 +68,16 @@ def _bool(name: str, default: bool) -> bool:
 
 
 def _resolve_public_url(port: int) -> tuple[str, tuple[str, ...], str]:
-    """(chosen base, all candidate bases, source). Explicit env wins; otherwise
-    fall back to auto-detected LAN addresses; otherwise empty (client uses its
-    own origin)."""
+    """(chosen base, all candidate bases, source). Explicit env wins; then the
+    URL Render assigns the service (RENDER_EXTERNAL_URL), since inside the
+    container LAN detection would only find a useless 10.x address; then
+    auto-detected LAN addresses; otherwise empty (client uses its own origin)."""
     explicit = os.environ.get("ISAFAN_PUBLIC_URL", "").strip().rstrip("/")
     if explicit:
         return explicit, (explicit,), "config"
+    render = os.environ.get("RENDER_EXTERNAL_URL", "").strip().rstrip("/")
+    if render:
+        return render, (render,), "render"
     try:
         candidates = tuple(f"http://{ip}:{port}" for ip in lan_ips())
     except Exception:  # detection must never break startup
@@ -82,8 +87,13 @@ def _resolve_public_url(port: int) -> tuple[str, tuple[str, ...], str]:
     return "", (), "origin"
 
 
+def _port() -> int:
+    """ISAFAN_PORT, else PORT (set by Render and most PaaS hosts), else 8000."""
+    return _int("ISAFAN_PORT", _int("PORT", 8000))
+
+
 def load_settings() -> Settings:
-    port = _int("ISAFAN_PORT", 8000)
+    port = _port()
     public_url, public_url_candidates, public_url_source = _resolve_public_url(port)
     return Settings(
         host=os.environ.get("ISAFAN_HOST", "0.0.0.0"),
