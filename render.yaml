@@ -1,0 +1,50 @@
+# Not read by Render — the service was created by hand. Keep in step with the
+# dashboard.
+#
+# This file documents the settings of the one free Render web service that runs
+# isafan (SPA + API + WebSocket from one origin, built from the Dockerfile).
+# Every change here must also be made in the Render dashboard, and vice versa.
+# Secrets are listed with `sync: false` and no value: their values live only in
+# the dashboard. Never commit them here.
+
+services:
+  - type: web
+    name: isafan
+    runtime: docker
+    plan: free
+    branch: main            # main moves only by fast-forward from dev, with an OK
+    autoDeploy: true
+    healthCheckPath: /api/health
+    # PORT and RENDER_EXTERNAL_URL are set by Render itself; the app listens on
+    # PORT and uses RENDER_EXTERNAL_URL as the join-link / QR base.
+    envVars:
+      # Reverse-proxy hops to trust in X-Forwarded-For. PLACEHOLDER until the
+      # post-deploy check (docs/deploy-render.md item 8 / H3) measures it.
+      # 0 = every visitor shares the proxy's IP for rate limits.
+      - key: ISAFAN_TRUST_PROXY
+        value: "0"
+      # Audio + song library in Cloudflare R2: the free tier's disk is wiped on
+      # every deploy and sleep.
+      - key: ISAFAN_STORAGE
+        value: s3
+      - key: ISAFAN_S3_REGION
+        value: auto
+      # Not used for audio while ISAFAN_STORAGE=s3; matches the Dockerfile's
+      # /data mount point. Wiped on deploy and sleep; nothing durable lives here.
+      - key: ISAFAN_DATA_DIR
+        value: /data
+      # --- secrets: set in the dashboard -----------------------------------
+      - key: ISAFAN_S3_BUCKET
+        sync: false
+      - key: ISAFAN_S3_ENDPOINT
+        sync: false
+      - key: ISAFAN_S3_ACCESS_KEY
+        sync: false
+      - key: ISAFAN_S3_SECRET_KEY
+        sync: false
+      - key: ISAFAN_ADMIN_USER
+        sync: false
+      - key: ISAFAN_ADMIN_PASSWORD_HASH   # python -m server.admin.hashpw
+        sync: false
+      - key: ISAFAN_ADMIN_SECRET
+        sync: false

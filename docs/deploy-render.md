@@ -99,7 +99,7 @@ iterating, and run the full `pytest` before any push.
 - **Done when:** a `test_ws.py` case shows that open sockets get a 1012 close
   when the app shuts down.
 
-### 5. [ ] `render.yaml` (documentation only)
+### 5. [x] `render.yaml` (documentation only) (see log)
 - **Needs:** 1–4 (so it describes the final env vars).
 - Repo root. `runtime: docker`, `plan: free`, `branch: main`,
   `autoDeploy: true`, `healthCheckPath: /api/health`, service name `isafan`.
@@ -233,4 +233,5 @@ Newest last. One line per event: date · item · what happened · commit.
 - 2026-11-02 · 2 · review back: 1 high (rate-limiter `_gc` goes quadratic with many keys), IPv6 /128 keys, uvicorn `proxy_headers` on by default, plus notes for H3/item 8. Fixes follow item 4.
 - 2026-11-02 · 4 · `Hub.close_all()` (1012) tracks every accepted socket and runs first on lifespan shutdown; `socket.ts` already reconnects on any close it didn't start, so no web change; 2 tests in `test_ws.py`; full pytest 173 passed. · 93c7b67
 - 2026-11-02 · 2 · review fixes: limiter GC amortised + LRU cap (was quadratic: 21 s for 20k keys), IPv6 keyed by /64, zone ids / v4-mapped normalised, uvicorn `proxy_headers=False`. Not fixed (out of scope, low): the admin login throttle also charges successful logins. Config notes added to H3 / item 8. · 18c43c1
-- 2026-11-02 · 3 · review back: no traversal on Linux. Fixed: exact-spelling realpath check (Windows 8.3 `ENV~1` -> `.env` leak on dev boxes, case/trailing-dot aliases), ENAMETOOLONG/EACCES now 404 not 500, resolved `index`, `/api` + HEAD never fall through to the SPA. Symlink test still only runs where symlinks are allowed. · this commit
+- 2026-11-02 · 3 · review back: no traversal on Linux. Fixed: exact-spelling realpath check (Windows 8.3 `ENV~1` -> `.env` leak on dev boxes, case/trailing-dot aliases), ENAMETOOLONG/EACCES now 404 not 500, resolved `index`, `/api` + HEAD never fall through to the SPA. Symlink test still only runs where symlinks are allowed. · 4bce476
+- 2026-11-02 · 5 · `render.yaml` added as docs only; `ISAFAN_TRUST_PROXY` is a `"0"` placeholder until item 8 / H3. · this commit
