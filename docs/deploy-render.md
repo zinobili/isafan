@@ -50,7 +50,7 @@ iterating, and run the full `pytest` before any push.
 - **Done when:** tests cover the port precedence and `RENDER_EXTERNAL_URL`;
   full `pytest` passes (config is cross-cutting).
 
-### 2. [x] Real client IP behind proxies (see log)
+### 2. [x] Real client IP behind proxies (a9698df; review pending)
 - **Needs:** 1.
 - Add `client_ip(headers, peer_host, trusted_hops)` to `server/net.py`. With
   `trusted_hops = N > 0`, walk `X-Forwarded-For` from the right and trust
@@ -69,7 +69,7 @@ iterating, and run the full `pytest` before any push.
 - Live hop count gets confirmed in item 8. Don't guess it from FI1M (that one
   had Cloudflare in front, while plain `onrender.com` may differ).
 
-### 3. [ ] Harden the static handler and add cache headers
+### 3. [x] Harden the static handler and add cache headers (see log; review pending)
 - **Needs:** 1. (Can follow 2 directly.)
 - In `server/main.py` `spa()`:
   - Decode once. Refuse null bytes, `\`, `:`, `//`, and any segment starting
@@ -213,4 +213,6 @@ Newest last. One line per event: date · item · what happened · commit.
 - 2026-11-02 · — · checklist written.
 - 2026-11-02 · setup · `dev` branched from `main`; checklist committed. Human chose: lead writes items 1–4 itself (no implementer subagent), read-only security-reviewer subagent after 2 and 3; away mode on. · 4f8de6a
 - 2026-11-02 · 1 · `PORT` fallback + `RENDER_EXTERNAL_URL` join link, Dockerfile node:22 and no pinned port, new `test_config.py`; full pytest 129 passed. · d91005e
-- 2026-11-02 · 2 · `net.client_ip` / `connection_ip`, `ISAFAN_TRUST_PROXY` (default 0) wired into main, admin auth and the WS `Hub`; tests in `test_net.py` + `test_ratelimit.py`; full pytest 143 passed. · this commit
+- 2026-11-02 · 2 · `net.client_ip` / `connection_ip`, `ISAFAN_TRUST_PROXY` (default 0) wired into main, admin auth and the WS `Hub`; tests in `test_net.py` + `test_ratelimit.py`; full pytest 143 passed. · a9698df
+- 2026-11-02 · 2 · security-reviewer subagent started on a9698df.
+- 2026-11-02 · 3 · handler moved to new `server/spa.py` (`mount_spa`, called last in `main.py`) so tests can mount it over a fake dist; guards also refuse a leading `/` (URL `//etc/passwd`); GET + HEAD; `test_static.py` added (symlink case skips on Windows without symlink rights). · this commit

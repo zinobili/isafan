@@ -10,7 +10,7 @@ from collections.abc import AsyncIterator
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 
 from . import __version__, audio, media, retention
 from .admin.routes import build_admin_router
@@ -20,6 +20,7 @@ from .game import GameRegistry
 from .net import connection_ip
 from .ratelimit import RateLimiter
 from .songs import SongLibrary
+from .spa import mount_spa
 from .storage import build_storage
 from .ws import Hub
 
@@ -174,15 +175,6 @@ def api_not_found(_rest: str):
 
 
 # --- static SPA (optional; present after `npm run build`) --------------------
+# Registered last: it is a catch-all. Path guards and cache headers: server/spa.py.
 
-_STATIC = settings.static_dir.resolve()
-_INDEX = _STATIC / "index.html"
-
-if _INDEX.is_file():
-
-    @app.get("/{full_path:path}")
-    def spa(full_path: str):
-        candidate = (_STATIC / full_path).resolve()
-        if full_path and candidate.is_file() and _STATIC in candidate.parents:
-            return FileResponse(candidate)
-        return FileResponse(_INDEX)
+mount_spa(app, settings.static_dir)

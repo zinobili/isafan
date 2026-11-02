@@ -49,6 +49,7 @@ While iterating, run **only** the file(s) mapped to what changed. Run the full
 | `server/game.py` | `pytest server/tests/test_game.py server/tests/test_ws.py` |
 | `server/media.py`, `server/clips.py` | `pytest server/tests/test_media.py server/tests/test_admin_games.py` |
 | `server/ws.py` | `pytest server/tests/test_ws.py` |
+| `server/spa.py` (static SPA handler) | `pytest server/tests/test_static.py` |
 | `server/net.py` | `pytest server/tests/test_net.py server/tests/test_ratelimit.py` |
 | `server/retention.py` | `pytest server/tests/test_retention.py server/tests/test_status.py` |
 | `server/ratelimit.py` | `pytest server/tests/test_ratelimit.py server/tests/test_admin.py` |
