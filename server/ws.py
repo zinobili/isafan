@@ -25,14 +25,19 @@ server -> client:
 
 from __future__ import annotations
 
+import contextlib
 import json
 
 from fastapi import WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
 
 from .game import GameRegistry, Phase
 from .net import connection_ip
 from .ratelimit import RateLimiter
 
+
+# Close code for "service restart": sent on shutdown so clients reconnect.
+CLOSE_SERVICE_RESTART = 1012
 
 # Latecomers may still join up to the point where the audience starts recording.
 _JOINABLE_PHASES = {Phase.LOBBY, Phase.HOST_RECORDING, Phase.REVERSED_PLAYBACK}
@@ -50,6 +55,8 @@ class Hub:
         self._trust_proxy = trust_proxy  # X-Forwarded-For hops to trust for the client IP
         # code -> { player_id -> WebSocket }
         self._conns: dict[str, dict[str, WebSocket]] = {}
+        # every accepted socket, in a room or not; closed on shutdown
+        self._open: set[WebSocket] = set()
 
     # ------------------------------------------------------------------ send
 
@@ -80,8 +87,20 @@ class Hub:
 
     # --------------------------------------------------------------- lifecycle
 
+    async def close_all(self, code: int = CLOSE_SERVICE_RESTART) -> None:
+        """Close every open socket (default 1012, "service restart"). Called on
+        lifespan shutdown (SIGTERM on each deploy and on free-tier sleep) so
+        clients get a clean close and run their reconnect + rejoin path instead
+        of waiting on a dead TCP connection."""
+        for ws in list(self._open):
+            if ws.application_state == WebSocketState.CONNECTED:
+                with contextlib.suppress(Exception):
+                    await ws.close(code=code, reason="server restarting")
+        self._open.clear()
+
     async def handle(self, ws: WebSocket) -> None:
         await ws.accept()
+        self._open.add(ws)
         code: str | None = None
         player_id: str | None = None
         try:
@@ -126,7 +145,12 @@ class Hub:
                     await self._err(ws, "unknown_type", f"unknown message type: {mtype!r}")
         except WebSocketDisconnect:
             pass
+        except RuntimeError:
+            # receive after close_all() closed us from the server side
+            if ws.application_state != WebSocketState.DISCONNECTED:
+                raise
         finally:
+            self._open.discard(ws)
             await self._detach(code, player_id, remove=False)
 
     # ------------------------------------------------------------------ verbs

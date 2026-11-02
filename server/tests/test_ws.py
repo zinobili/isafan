@@ -134,3 +134,42 @@ def test_rejoin_after_drop(client):
             p2.send_json({"type": "rejoin", "code": code, "playerId": pid})
             assert _recv(p2, "joined")["playerId"] == pid
         assert pid in registry.get(code).players
+
+
+# --- graceful shutdown ---------------------------------------------------------
+
+def test_close_all_sends_1012_to_open_sockets(client):
+    import pytest as _pytest
+    from starlette.websockets import WebSocketDisconnect as _Disconnect
+
+    from server.main import hub as _hub
+
+    with client.websocket_connect("/ws") as in_room, client.websocket_connect("/ws") as idle:
+        in_room.send_json({"type": "create", "name": "Host", "mode": "multi"})
+        assert in_room.receive_json()["type"] == "joined"
+        idle.send_json({"type": "ping"})
+        assert idle.receive_json() == {"type": "pong"}
+
+        client.portal.call(_hub.close_all)
+
+        for ws in (in_room, idle):
+            with _pytest.raises(_Disconnect) as exc:
+                ws.receive_json()
+            assert exc.value.code == 1012
+    assert not _hub._open
+
+
+def test_lifespan_shutdown_calls_close_all(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import server.main as main
+
+    calls = []
+
+    async def fake_close_all(code: int = 1012) -> None:
+        calls.append(code)
+
+    monkeypatch.setattr(main.hub, "close_all", fake_close_all)
+    with TestClient(main.app):
+        assert calls == []
+    assert calls == [1012]

@@ -69,7 +69,7 @@ iterating, and run the full `pytest` before any push.
 - Live hop count gets confirmed in item 8. Don't guess it from FI1M (that one
   had Cloudflare in front, while plain `onrender.com` may differ).
 
-### 3. [x] Harden the static handler and add cache headers (see log; review pending)
+### 3. [x] Harden the static handler and add cache headers (04228fe; review pending)
 - **Needs:** 1. (Can follow 2 directly.)
 - In `server/main.py` `spa()`:
   - Decode once. Refuse null bytes, `\`, `:`, `//`, and any segment starting
@@ -89,7 +89,7 @@ iterating, and run the full `pytest` before any push.
   `/foo.png`, the three cache headers, and an `/api/nope` JSON 404. Add the new
   file to the `isafan-dev` skill's test map.
 
-### 4. [ ] Graceful shutdown of WebSockets
+### 4. [x] Graceful shutdown of WebSockets (see log)
 - **Needs:** 1. Touches `server/ws.py`, so not in parallel with 2.
 - On lifespan shutdown (SIGTERM on every deploy and sleep), the `Hub` closes
   every open socket with code `1012` (service restart) before the retention
@@ -215,4 +215,7 @@ Newest last. One line per event: date · item · what happened · commit.
 - 2026-11-02 · 1 · `PORT` fallback + `RENDER_EXTERNAL_URL` join link, Dockerfile node:22 and no pinned port, new `test_config.py`; full pytest 129 passed. · d91005e
 - 2026-11-02 · 2 · `net.client_ip` / `connection_ip`, `ISAFAN_TRUST_PROXY` (default 0) wired into main, admin auth and the WS `Hub`; tests in `test_net.py` + `test_ratelimit.py`; full pytest 143 passed. · a9698df
 - 2026-11-02 · 2 · security-reviewer subagent started on a9698df.
-- 2026-11-02 · 3 · handler moved to new `server/spa.py` (`mount_spa`, called last in `main.py`) so tests can mount it over a fake dist; guards also refuse a leading `/` (URL `//etc/passwd`); GET + HEAD; `test_static.py` added (symlink case skips on Windows without symlink rights). · this commit
+- 2026-11-02 · 3 · handler moved to new `server/spa.py` (`mount_spa`, called last in `main.py`) so tests can mount it over a fake dist; guards also refuse a leading `/` (URL `//etc/passwd`); GET + HEAD; `test_static.py` added (symlink case skips on Windows without symlink rights). · 04228fe
+- 2026-11-02 · 3 · security-reviewer subagent started on 04228fe.
+- 2026-11-02 · 2 · review back: 1 high (rate-limiter `_gc` goes quadratic with many keys), IPv6 /128 keys, uvicorn `proxy_headers` on by default, plus notes for H3/item 8. Fixes follow item 4.
+- 2026-11-02 · 4 · `Hub.close_all()` (1012) tracks every accepted socket and runs first on lifespan shutdown; `socket.ts` already reconnects on any close it didn't start, so no web change; 2 tests in `test_ws.py`; full pytest 173 passed. · this commit

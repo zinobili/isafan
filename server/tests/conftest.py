@@ -46,10 +46,12 @@ def _isolate():
     for game in registry.all():
         registry.drop(game.code)
     hub._conns.clear()
+    hub._open.clear()
     yield
     for game in registry.all():
         registry.drop(game.code)
     hub._conns.clear()
+    hub._open.clear()
 
 
 @pytest.fixture

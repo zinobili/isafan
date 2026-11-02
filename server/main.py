@@ -37,7 +37,8 @@ def _client_ip(request: Request) -> str:
 
 @contextlib.asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    """Run the retention sweep on a background interval while the app is up."""
+    """Run the retention sweep on a background interval while the app is up.
+    On shutdown, close every WebSocket with 1012 first, then stop the sweep."""
     task: asyncio.Task | None = None
     if settings.game_ttl_seconds > 0 and settings.purge_interval_seconds > 0:
         task = asyncio.create_task(
@@ -51,6 +52,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await hub.close_all()
         if task:
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
