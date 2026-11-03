@@ -113,7 +113,7 @@ iterating, and run the full `pytest` before any push.
 - Header comment: "Not read by Render — the service was created by hand. Keep
   in step with the dashboard."
 
-### 6. [!] Local container smoke test (blocked on H6: Docker engine not running)
+### 6. [x] Local container smoke test (see log)
 - **Needs:** 1–5.
 - `docker build -t isafan .` then
   `docker run --rm -e PORT=10000 -p 10000:10000 isafan` (local storage is
@@ -122,7 +122,7 @@ iterating, and run the full `pytest` before any push.
   `/host` for the cache headers; a traversal URL gets a 404; one solo round in
   the browser pane at `http://localhost:10000/solo` (record with a synthetic
   mic or the file fallback). Stop the container afterwards.
-- Record what you checked in the log. Docker 20.10 is installed on the dev box.
+- Record what you checked in the log. Docker Desktop 29.9 is installed on the dev box (reinstalled 2026-11-03).
 
 ### 7. [x] README "Deploy (Render)" section (see log; live URL still to fill after H2)
 - **Needs:** 5. Fill the live URL in after the human finishes H2.
@@ -178,7 +178,7 @@ the default you'll assume if the change is reversible.
 - **H4. [ ] Real-phone test over HTTPS:** in-page recording on Android Chrome
   and iPhone Safari, one full multi-device round, and admin login.
 - **H5. [ ] Release OKs.** Every fast-forward of `main` needs a yes in chat.
-- **H6. [ ] Start Docker Desktop** (2026-11-02). Item 6 needs the Docker
+- **H6. [x] Start Docker Desktop** (2026-11-02; done 2026-11-03: the old install was removed and the latest was installed with winget). Item 6 needs the Docker
   engine. Launching `Docker Desktop.exe` from the session left only
   `com.docker.service` running and the `docker-desktop` WSL distro stopped;
   it likely wants a click (update, sign-in or licence prompt). Start it, wait
@@ -244,4 +244,5 @@ Newest last. One line per event: date · item · what happened · commit.
 - 2026-11-02 · 6 · blocked: Docker engine won't start without someone at the desktop → H6.
 - 2026-11-02 · 7 · README "Deploy (Render)" section, trust-proxy note in the Docker section, Status → Phase 8. Live URL is a placeholder until H2. · this commit
 - 2026-11-03 · H3 · human set `ISAFAN_TRUST_PROXY=3` up front; `render.yaml` updated; item 8 still measures the real hop count.
+- 2026-11-03 · 6 · Docker Desktop 29.9.2 installed via winget. Image builds (node:22 stage). Container on `PORT=10000` with `RENDER_EXTERNAL_URL` set: health 200, ffmpeg ok, `/api/config` publicUrl = the Render URL (source `render`). Cache headers: asset immutable, `/` and `/host` no-cache. 404 for `/assets/nope.js`, `/foo.png`, `/api/nope` and 5 traversal URLs (`--path-as-is`). Headless solo round (original + attempt, reversed WAV download, wrong key 404). `docker stop` gives an open WS a 1012 close (empty reason, so uvicorn may send it before our hook). Not done: an in-browser round (no browser pane in this session). No favicon in dist, so the 1 h cache rule was only exercised in tests.
 - 2026-11-02 · — · away mode stopped: what's left is 6 (H6), 8 (H1 + H2), and the live URL in 7 (H2).
