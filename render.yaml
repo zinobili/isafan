@@ -18,11 +18,12 @@ services:
     # PORT and RENDER_EXTERNAL_URL are set by Render itself; the app listens on
     # PORT and uses RENDER_EXTERNAL_URL as the join-link / QR base.
     envVars:
-      # Reverse-proxy hops to trust in X-Forwarded-For. PLACEHOLDER until the
-      # post-deploy check (docs/deploy-render.md item 8 / H3) measures it.
-      # 0 = every visitor shares the proxy's IP for rate limits.
+      # Reverse-proxy hops to trust in X-Forwarded-For. 3 was chosen by the human
+      # on 2026-11-03, before measuring; the post-deploy check
+      # (docs/deploy-render.md item 8) confirms it. If the real path is
+      # shorter, clients can spoof their IP, so lower it to the measured count.
       - key: ISAFAN_TRUST_PROXY
-        value: "0"
+        value: "3"
       # Audio + song library in Cloudflare R2: the free tier's disk is wiped on
       # every deploy and sleep.
       - key: ISAFAN_STORAGE

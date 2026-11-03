@@ -163,7 +163,7 @@ the default you'll assume if the change is reversible.
   Docker, branch `main`, plan Free, health check `/api/health`, auto-deploy on.
   Env vars as listed in `render.yaml` (generate the admin hash with
   `python -m server.admin.hashpw`). Then tell the agent the live URL.
-- **H3. [ ] Pick the trust-proxy hop count** from the item 8 status line, set
+- **H3. [~] Pick the trust-proxy hop count** (human chose **3** on 2026-11-03, before measuring; item 8 confirms or lowers it) from the item 8 status line, set
   `ISAFAN_TRUST_PROXY` in the dashboard, and confirm two phones on different
   networks get different IPs.
   - *From the item 2 security review (2026-11-02):* set N to the **shortest
@@ -243,4 +243,5 @@ Newest last. One line per event: date · item · what happened · commit.
 - 2026-11-02 · 5 · `render.yaml` added as docs only; `ISAFAN_TRUST_PROXY` is a `"0"` placeholder until item 8 / H3. · f66de0d
 - 2026-11-02 · 6 · blocked: Docker engine won't start without someone at the desktop → H6.
 - 2026-11-02 · 7 · README "Deploy (Render)" section, trust-proxy note in the Docker section, Status → Phase 8. Live URL is a placeholder until H2. · this commit
+- 2026-11-03 · H3 · human set `ISAFAN_TRUST_PROXY=3` up front; `render.yaml` updated; item 8 still measures the real hop count.
 - 2026-11-02 · — · away mode stopped: what's left is 6 (H6), 8 (H1 + H2), and the live URL in 7 (H2).
